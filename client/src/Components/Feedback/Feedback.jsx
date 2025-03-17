@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect } from "react";
 
 import {
-  // Paper,
   Grid,
   TextField,
   Container,
   Button,
+  CircularProgress,
   TableContainer,
   Paper,
   Table,
@@ -16,514 +16,442 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
-  DialogContentText,
   FormControl,
   DialogActions,
-} from '@material-ui/core'
-import AddIcon from '@material-ui/icons/Add'
-import DeleteIcon from '@material-ui/icons/Delete'
-import EditIcon from '@material-ui/icons/Edit'
-import { formatDate } from './../../Tools/Tools'
-import { useForm } from './../../Custom-Hook/userForm'
-import SaveIcon from '@material-ui/icons/Save'
-import Alert from '@material-ui/lab/Alert'
-import CancelOutlinedIcon from '@material-ui/icons/CancelOutlined';
-import {
-  fetchTaskUsers,
-  createUser,
-  editUser,
-  deleteUser,
-} from './../../Api/Users/Users'
-import { checkToken } from '../../Api/Users/Users'
-import { useHistory } from 'react-router'
-//import { Feedback } from '@material-ui/icons'
+  Typography,
+  RadioGroup,
+  FormControlLabel,
+  Radio,
+} from "@material-ui/core";
 import { makeStyles } from "@material-ui/core/styles";
+import AddIcon from "@material-ui/icons/Add";
+import EditIcon from "@material-ui/icons/Edit";
+import FeedbackIcon from "@material-ui/icons/Feedback"; // Icon for feedback
+import Alert from "@material-ui/lab/Alert";
+import { useForm } from "./../../Custom-Hook/userForm";
+import { checkToken, fetchTaskUsers } from "./../../Api/Users/Users";
+import { useHistory } from "react-router-dom";
+import axios from "axios";
 
-function Feedback() {
-  const [users, setUsers] = useState([])
-  const [userForm, handleChange, setUserForm] = useForm({
-    name: '',
-    username: '',
-    password: '',
-    userType: '',
-  })
-  const [createModal, setCreateModal] = useState(false)
-  const [isEdit, setIsEdit] = useState(false)
-  const [processing, setProcessing] = useState(false)
-  const [errorAlert, setErrorAlert] = useState('')
-  const [alert, setAlert] = useState('')
-  const [deleteAlert, setDeleteAlert] = useState(false)
-  const [userType, setUserType] = useState(null)
-  const [ratings, setRatings] = useState({});
-  const history = useHistory()
-  
-  
-
-const useStyles = makeStyles({
-  button: {
-    width: "100%",
-    height: "100%",
-    backgroundColor: "#1976d2", // Primary Blue
-    color: "#fff",
-    fontWeight: "bold",
-    fontSize: "18px",
-    borderRadius: "0", // Makes it fit perfectly inside the table
-    transition: "all 0.3s ease",
+// Custom styles using makeStyles
+const useStyles = makeStyles((theme) => ({
+  tableHeader: {
+    backgroundColor: theme.palette.primary.main,
+    color: theme.palette.common.white,
+  },
+  tableRow: {
     "&:hover": {
-      backgroundColor: "#135ba1", // Darker Blue on Hover
+      backgroundColor: theme.palette.action.hover,
     },
   },
-});
+  modalTitle: {
+    backgroundColor: theme.palette.primary.main,
+    color: theme.palette.common.white,
+    padding: theme.spacing(2),
+  },
+  modalContent: {
+    padding: theme.spacing(3),
+  },
+  button: {
+    margin: theme.spacing(1),
+  },
+  loadingSpinner: {
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    height: "100vh",
+  },
+}));
 
-const classes = useStyles();
-  useEffect(() => {
-    let isCancelled = false
-    const fetchApi = async () => {
-      const res = await checkToken()
-      if (res === undefined) history.push('/')
-      else if (res.status === 401) history.push('/')
+function FeedBack() {
+  const classes = useStyles();
+  const [users, setUsers] = useState([]);
+  const [userForm, handleChange, setUserForm] = useForm({
+    userId: "",
+    username: "",
+    userType: "Project Leader",
+    taskdate: "",
+    taskdesc: "",
+    status: "Pending",
+  });
+  const [createModal, setCreateModal] = useState(false);
+  const [isEdit, setIsEdit] = useState(false);
+  const [processing, setProcessing] = useState(false);
+  const [errorAlert, setErrorAlert] = useState("");
+  const [alert, setAlert] = useState("");
+  const [userType, setUserType] = useState(null);
+  const [tasks, setTasks] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [feedbackModal, setFeedbackModal] = useState(false); // State for feedback modal
+  const [selectedUser, setSelectedUser] = useState(null); // Selected user for feedback
+  const [feedback, setFeedback] = useState({
+    skills: Array(15).fill(""), // Initializes 15 empty values for skill feedback
+    overallReview: "",
+  });
 
-      if (!isCancelled) {
-        setUserType(res.data.userType)
-      }
-    }
+  const history = useHistory();
+
+  const skills = [
+    "Communication",
+    "Problem Solving",
+    "Teamwork",
+    "Time Management",
+    "Leadership",
+    "Technical Skills",
+    "Creativity",
+    "Adaptability",
+    "Project Management",
+    "Critical Thinking",
+    "Attention to Detail",
+    "Organization",
+    "Learning Ability",
+    "Collaboration",
+    "Initiative",
+  ];
+
+  const handleSkillChange = (index, value) => {
+    const updatedSkills = [...feedback.skills];
+    updatedSkills[index] = value;
+    setFeedback({ ...feedback, skills: updatedSkills });
+  };
+
+  const handleOverallReviewChange = (e) => {
+    setFeedback({ ...feedback, overallReview: e.target.value });
+  };
+
+  const handleFeedbackSubmit = (e) => {
+    e.preventDefault();
+    console.log("Feedback for user:", selectedUser, feedback);
+    // You can handle form submission logic here, such as making an API request
+    setFeedbackModal(false); // Close the feedback modal
+  };
+
+  const getTask = async () => {
     try {
-      fetchApi()
-    } catch (e) {
-      console.log(e)
+      const response = await axios.get("http://localhost:4000/api/allocate/get-task");
+      setTasks(response.data.data); // Store tasks in state
+      setLoading(false);
+    } catch (err) {
+      console.log(err.message);
+      setLoading(false);
     }
-    return () => (isCancelled = true)
-  }, [history])
-
-
-
+  };
 
   useEffect(() => {
-    let isCancelled = false
+    let isCancelled = false;
     const fetchApi = async () => {
-      const res = await fetchTaskUsers()
-      if (!isCancelled) {
-        setUsers(res)
+      try {
+        const res = await checkToken();
+        if (res === undefined || res.status === 401) {
+          history.push("/");
+        } else if (!isCancelled) {
+          setUserType(res.data.userType);
+        }
+      } catch (e) {
+        console.log(e);
       }
-    }
-    fetchApi()
-    return () => (isCancelled = true)
-  }, [])
+    };
+    fetchApi();
+    return () => (isCancelled = true);
+  }, [history]);
 
-  
+  useEffect(() => {
+    getTask(); // Fetch tasks
+    let isCancelled = false;
+    const fetchApi = async () => {
+      try {
+        const res = await fetchTaskUsers();
+        if (!isCancelled) {
+          setUsers(res); // Set users in state
+        }
+      } catch (e) {
+        console.log(e);
+      }
+    };
+    fetchApi();
+    return () => (isCancelled = true);
+  }, []);
+
   const registerUser = async (e) => {
-    e.preventDefault()
-    setProcessing(true)
-    const res = isEdit ? await editUser(userForm) : await createUser(userForm)
-   
-    if (res.status === 200 || res.status === 201) {
-      setCreateModal(false)
-      if (isEdit) {
-        setUsers(
-          users.map((user) => (user.id === res.data.id ? res.data : user))
-        )
-        setAlert(<Alert severity="success">Successfully edited User.</Alert>)
+    e.preventDefault();
+    setProcessing(true);
+
+    try {
+      const taskData = {
+        userId: userForm.userId,
+        plname: userForm.username,
+        type: userForm.userType,
+        taskDate: userForm.taskdate,
+        desc: userForm.taskdesc,
+        status: userForm.status || "Pending",
+      };
+      console.log("Sending payload:", taskData);
+
+      const res = await axios.post("http://localhost:4000/api/allocate/create-task", taskData);
+
+      console.log("Response from server:", res.data);
+
+      if (res.status === 200 || res.status === 201) {
+        setCreateModal(false);
+        if (isEdit) {
+          setUsers(users.map((user) => (user.id === res.data.id ? res.data : user)));
+          setAlert(<Alert severity="success">Successfully edited Task.</Alert>);
+        } else {
+          setUsers([res.data, ...users]);
+          setAlert(<Alert severity="success">Successfully added new Task.</Alert>);
+        }
+        getTask(); // Refresh tasks
+
+        setTimeout(() => {
+          setAlert("");
+        }, 5000);
       } else {
-      setUsers([res.data, ...users])
-      setAlert(<Alert severity="success">Successfully added new User.</Alert>)
+        setErrorAlert(
+          <Alert style={{ textTransform: "capitalize" }} severity="error">
+            {res.data.error}
+          </Alert>
+        );
+        setTimeout(() => {
+          setErrorAlert("");
+        }, 10000);
       }
-      setTimeout(() => {
-        setAlert('')
-      }, 5000)
-    } else {
+    } catch (err) {
+      console.error("Error:", err.response?.data || err.message);
       setErrorAlert(
-        <Alert style={{ textTransform: 'capitalize' }} severity="error">
-          {res.data.error}
+        <Alert style={{ textTransform: "capitalize" }} severity="error">
+          {err.response?.data?.error || err.message || "An error occurred."}
         </Alert>
-      )
+      );
       setTimeout(() => {
-        setErrorAlert('')
-      }, 10000)
+        setErrorAlert("");
+      }, 10000);
     }
 
-    setProcessing(false)
-  }
-  const destroyUser = async () => {
-    setProcessing(true)
-    const res = await deleteUser(userForm)
-    if (res.status === 200 || res.status === 204) {
-      setProcessing(false)
-      setDeleteAlert(false)
-      setUsers(users.filter((user) => user.id !== userForm.id))
-      setUserForm({ username: '', name: '', password:'',userType:''})
-      setErrorAlert(
-        <Alert style={{ textTransform: 'capitalize' }} severity="error">
-          You Have Successfully Deleted User.
-        </Alert>
-      )
-      setTimeout(() => {
-        setErrorAlert('')
-      }, 10000)
-    }
-  }
+    setProcessing(false);
+  };
 
-  //Dialogs
   const addDialog = (
     <Dialog
       open={createModal}
       onClose={() => {
-        setCreateModal(false)
+        setCreateModal(false);
         setUserForm({
-          name: '',
-          username: '',
-          password: '',
-          userType: 'Project Leader',
-        })
+          userId: "",
+          username: "",
+          userType: "Project Leader",
+          taskdate: "",
+          taskdesc: "",
+          status: "Pending",
+        });
       }}
       scroll="body"
       fullWidth
     >
-      <form onSubmit={registerUser} method="post">
-        <Container>
-          <DialogTitle className="mt-2">
-          { isEdit ? 'Allocate' : 'Add'} 
-            Task</DialogTitle>
-        </Container>
-        <DialogContent>
+      <DialogTitle className={classes.modalTitle}>
+        {isEdit ? "Allocate Task" : "Add Task"}
+      </DialogTitle>
+      <DialogContent className={classes.modalContent}>
+        <form onSubmit={registerUser} method="post">
           <Container>
             {errorAlert}
             <FormControl margin="normal" fullWidth>
               <TextField
                 required
-                name="name"
+                name="userId"
                 onChange={handleChange}
-                value={userForm.name}
-                label="Name"
+                value={userForm.userId}
+                label="User ID"
                 type="text"
                 fullWidth
+                InputProps={{ readOnly: true }}
               />
             </FormControl>
             <FormControl margin="normal" fullWidth>
-            <TextField
-  required
-  name="taskdate"
-  onChange={handleChange}
-  label="Task Date"
-  type="date"
-  value={userForm.taskdate || ""} // Ensure it has a default value
-  fullWidth
-  InputLabelProps={{ shrink: true }} // Ensures label stays above
-/>
-
+              <TextField
+                required
+                name="username"
+                onChange={handleChange}
+                value={userForm.username}
+                label="Developer Name"
+                type="text"
+                fullWidth
+                InputProps={{ readOnly: true }}
+              />
             </FormControl>
             <FormControl margin="normal" fullWidth>
-            <TextField
-  required
-  name="taskdesc"
-  onChange={handleChange}
-  value={userForm.taskdesc || ""} // Ensure correct state variable
-  label="Description"
-  type="text"
-  multiline
-  rows={4} // Adjust as needed
-  fullWidth
-/>
-
+              <TextField
+                required
+                name="taskdate"
+                onChange={handleChange}
+                label="Task Date"
+                type="date"
+                value={userForm.taskdate || ""}
+                fullWidth
+                InputLabelProps={{ shrink: true }}
+              />
             </FormControl>
-            
-          </Container>
-        </DialogContent>
-
-        <DialogActions>
-          <Container>
-            {!isEdit ? (
-              <Button
-                id="addBtn"
-                variant="contained"
-                color="primary"
-                endIcon={<AddIcon />}
-                disabled={processing}
-                style={{ marginBottom: '20px' }}
-                size="large"
-                type="submit"
+            <FormControl margin="normal" fullWidth>
+              <TextField
+                required
+                name="taskdesc"
+                onChange={handleChange}
+                value={userForm.taskdesc || ""}
+                label="Description"
+                type="text"
+                multiline
+                rows={4}
                 fullWidth
-              >
-                Add
-              </Button>
-            ) : (
-              <Button
-                id="editBtn"
-                variant="contained"
-                color="primary"
-                style={{ marginBottom: '20px' }}
-                endIcon={<SaveIcon />}
-                disabled={processing}
-                size="large"
-                fullWidth
-                type="submit"
-              >
-                Allocate
-              </Button>
-            )}
+              />
+            </FormControl>
           </Container>
-        </DialogActions>
-
-
-
-        
-      </form>
+          <DialogActions>
+            <Button
+              variant="contained"
+              color="secondary"
+              onClick={() => setCreateModal(false)}
+              className={classes.button}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="contained"
+              color="primary"
+              endIcon={<AddIcon />}
+              disabled={processing}
+              className={classes.button}
+            >
+              {isEdit ? "Save Task" : "Add Task"}
+            </Button>
+          </DialogActions>
+        </form>
+      </DialogContent>
     </Dialog>
-  )
-  const deleteDialog = (
-    <div>
-      <Dialog
-        open={deleteAlert}
-        onClose={() => {
-          setUserForm({ username: '', name: '', password: '', userType:''})
-          setDeleteAlert(false)
-        }}
-        maxWidth={'xs'}
-        aria-labelledby="alert-dialog-title"
-        aria-describedby="alert-dialog-description"
-      >
-        <DialogContent>
-          <CancelOutlinedIcon
-            style={{
-              color: '#e74c3c',
-              marginLeft: 'auto',
-              marginRight: 'auto',
-              textAlign: 'center',
-              display: 'block',
-              fontSize: '250px',
-            }}
-          />
-          <DialogContentText
-            style={{ textAlign: 'center' }}
-            id="alert-dialog-description"
-          >
-            Are you sure you want to delete <strong>{userForm.username}</strong>?
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button
-            onClick={() => {
-              destroyUser()
-            }}
-            disabled={processing}
-            color="primary"
-          >
-            Proceed
-          </Button>
-          <Button
-            color="primary"
-            autoFocus
-            onClick={() => {
-              setUserForm({ username: '', name: '', password: '', userType:'' })
-              setDeleteAlert(false)
-            }}
-          >
-            No
-          </Button>
-        </DialogActions>
-      </Dialog>
-    </div>
-  )
-  
+  );
+
+  const feedbackDialog = (
+    <Dialog
+      open={feedbackModal}
+      onClose={() => setFeedbackModal(false)}
+      scroll="body"
+      fullWidth
+    >
+      <DialogTitle className={classes.modalTitle}>
+        Developer Skills Feedback for {selectedUser?.name}
+      </DialogTitle>
+      <DialogContent className={classes.modalContent}>
+        <form onSubmit={handleFeedbackSubmit} method="post">
+          <Grid container spacing={2}>
+            {skills.map((skill, index) => (
+              <Grid item xs={12} key={index}>
+                <FormControl component="fieldset">
+                  <Typography variant="subtitle1">{skill}</Typography>
+                  <RadioGroup
+                    value={feedback.skills[index]}
+                    onChange={(e) => handleSkillChange(index, e.target.value)}
+                    row
+                  >
+                    <FormControlLabel
+                      value="Excellent"
+                      control={<Radio />}
+                      label="Excellent"
+                    />
+                    <FormControlLabel
+                      value="Good"
+                      control={<Radio />}
+                      label="Good"
+                    />
+                    <FormControlLabel
+                      value="Needs Improvement"
+                      control={<Radio />}
+                      label="Needs Improvement"
+                    />
+                  </RadioGroup>
+                </FormControl>
+              </Grid>
+            ))}
+          </Grid>
+
+          <Grid item xs={12} style={{ marginTop: "20px" }}>
+            <TextField
+              label="Overall Review"
+              value={feedback.overallReview}
+              onChange={handleOverallReviewChange}
+              multiline
+              rows={4}
+              fullWidth
+              variant="outlined"
+            />
+          </Grid>
+
+          <Grid item xs={12} style={{ marginTop: "20px" }}>
+            <Button
+              type="submit"
+              variant="contained"
+              color="primary"
+              fullWidth
+            >
+              Submit Feedback
+            </Button>
+          </Grid>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+
+  if (loading) {
+    return (
+      <div className={classes.loadingSpinner}>
+        <CircularProgress />
+      </div>
+    );
+  }
 
   return (
-    <div>
-      <Container>
-        <Grid container spacing={1}>
-        
-          
-        </Grid>
-        <Grid container style={{ marginTop: '30px' }}>
-          <Grid item xs={12}>
-            {alert}
-            <TableContainer component={Paper}>
-              <Table aria-label="simple table">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Name</TableCell>
-                    <TableCell>Type</TableCell>
-                    <TableCell>Username</TableCell>
-                   
-                   
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {users.map((user) => (
-                    <TableRow key={user.id}>
-                      <TableCell>{user.name}</TableCell>
-                      <TableCell>{user.userType}</TableCell>
-                      <TableCell>{user.username}</TableCell>
-                     
-                      
+    <Container>
+      <Grid container style={{ marginTop: "30px" }}>
+        <Grid item xs={12}>
+          {alert}
+          <TableContainer component={Paper}>
+            <Table aria-label="simple table">
+              <TableHead>
+                <TableRow className={classes.tableHeader}>
+                  <TableCell style={{ color: "white" }}>Name</TableCell>
+                  <TableCell style={{ color: "white" }}>User Type</TableCell>
+                  <TableCell  align="right" style={{ color: "white" }}>Feedback</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {users.map((user) => (
+                  <TableRow key={user.id} className={classes.tableRow}>
+                    <TableCell>{user.name}</TableCell>
+                    <TableCell>{user.userType}</TableCell>
                     
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-
-              <table border="1" style={{ width: "100%", height: "30%" }}>
-      <thead>
-        <tr>
-          <th style={{ width:"70%"}}><b>NUMERACY</b></th>
-          <th>Very Good</th>
-          <th>Good</th>
-          <th>Adequate</th>
-        </tr>
-      </thead>
-      <tbody>
-        {[
-          "Simple calculations",
-          "More complex calculations",
-          "Interpret graphs, Charts and Tables",
-          "Prepare Graphs, charts and tables to convey information",
-          "Presentations",
-          "Problem-solving capability"
-        ].map((skill, index) => (
-          <tr key={index}>
-            <td>{skill}</td>
-            {[5, 4, 3].map((value) => (
-              <td key={value}>
-                <input
-                  type="radio"
-                  name={`r${index + 1}`} 
-                  value={value}
-                  checked={ratings[`r${index + 1}`] === String(value)}
-                  onChange={handleChange}
-                />
-              </td>
-            ))}
-          </tr>
-        ))}
-      </tbody>
-    </table>
-
-    <table border="1" style={{ width: "100%", height: "30%" }}>
-      <thead>
-        <tr>
-          <th style={{ width:"70%"}}><b>COMMUNICATION SKILLS</b></th>
-          <th>Very Good</th>
-          <th>Good</th>
-          <th>Adequate</th>
-        </tr>
-      </thead>
-      <tbody>
-        {[
-          "composing own letter",
-          "Taking notes in meetings and minutes",
-          "Explain complex things",
-          "Lead a group discussion",
-          "Creatively explaining the Presentations",
-          "Gesture while explaining the project details"
-        ].map((skill, index) => (
-          <tr key={index}>
-            <td>{skill}</td>
-            {[5, 4, 3].map((value) => (
-              <td key={value}>
-                <input
-                  type="radio"
-                  name={`r${index + 1}`} 
-                  value={value}
-                  checked={ratings[`r${index + 1}`] === String(value)}
-                  onChange={handleChange}
-                />
-              </td>
-            ))}
-          </tr>
-        ))}
-      </tbody>
-    </table>
-
-
-    <table border="1" style={{ width: "100%", height: "30%" }}>
-      <thead>
-        <tr>
-          <th style={{ width:"70%"}}><b>INFORMATION TECHNOLOGY</b></th>
-          <th>Very Good</th>
-          <th>Good</th>
-          <th>Adequate</th>
-        </tr>
-      </thead>
-      <tbody>
-        {[
-          "Microsoft office Word Usage",
-          "Excel Spreadsheet Usage",
-          "Database Usage",
-          "Desktop publishing",
-          "Update Intranet and internet pages",
-          "E-mail Usage"
-        ].map((skill, index) => (
-          <tr key={index}>
-            <td>{skill}</td>
-            {[5, 4, 3].map((value) => (
-              <td key={value}>
-                <input
-                  type="radio"
-                  name={`r${index + 1}`} 
-                  value={value}
-                  checked={ratings[`r${index + 1}`] === String(value)}
-                  onChange={handleChange}
-                />
-              </td>
-            ))}
-          </tr>
-        ))}
-      </tbody>
-    </table>
-    <table border="1" style={{ width: "100%", height: "30%" }}>
-      <thead>
-        <tr>
-          <th style={{ width:"70%"}}><b>ERROR OCCURENCES IN TASK</b></th>
-          <th>Very Good</th>
-          <th>Good</th>
-          <th>Adequate</th>
-        </tr>
-      </thead>
-      <tbody>
-        {[
-          "Compile Error",
-          "Runtime Error",
-          "Capability of Solving Error",
-          "Logical Error",
-          "Update Intranet and internet pages",
-          "Abstract Thinking to Solve Error"
-        ].map((skill, index) => (
-          <tr key={index}>
-            <td>{skill}</td>
-            {[5, 4, 3].map((value) => (
-              <td key={value}>
-                <input
-                  type="radio"
-                  name={`r${index + 1}`} 
-                  value={value}
-                  checked={ratings[`r${index + 1}`] === String(value)}
-                  onChange={handleChange}
-                />
-              </td>
-            ))}
-          </tr>
-        ))}
-      </tbody>
-    </table>
-
-    <Table style={{ width: "100%", height: "100%" }}>
-        <TableBody>
-          <TableRow>
-            <TableCell style={{ padding: 0 }}>
-              <Button className={classes.button} onClick={() => alert("Form Submitted!")}>
-                Submit
-              </Button>
-            </TableCell>
-          </TableRow>
-        </TableBody>
-      </Table>
-
-
-            </TableContainer>
-          </Grid>
+                    
+                    <TableCell align="right">
+                      <FeedbackIcon
+                        style={{
+                          color: "#1976d2",
+                          marginLeft: "5px",
+                          cursor: "pointer",
+                        }}
+                        onClick={() => {
+                          setSelectedUser(user);
+                          setFeedbackModal(true);
+                        }}
+                      />
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
         </Grid>
-        {addDialog}
-        {deleteDialog}
-      </Container>
-    </div>
-  )
+      </Grid>
+      {addDialog}
+      {feedbackDialog}
+    </Container>
+  );
 }
-export default Feedback;
+
+export default FeedBack;

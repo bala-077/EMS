@@ -141,6 +141,16 @@ function LeadAllocation() {
     }
   };
 
+   const getStatus = async () => {
+      try{
+        const response = await axios.get('http://localhost:4000/api/allocate/get-status');
+        console.log(response.data);
+      }
+      catch(err){
+        console.log(err.message);
+      }
+    }
+
   const getTL = async () => {
     try {
       const response = await axios.get(
@@ -160,6 +170,7 @@ function LeadAllocation() {
 
   useEffect(() => {
     getTL();
+    getStatus();
   }, []);
 
   // Function to handle stage change

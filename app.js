@@ -41,7 +41,7 @@ const userExtractor = middleware.userExtractor;
 
 // Route Definitions
 app.use("/api/books", userExtractor, booksRouter);
-app.use("/api/users", usersRouter);
+app.use("/api/users", usersRouter);  
 // app.use("/api/allocate", projectAllocateRouter); // Project allocation routes
 app.use("/api/allocate/", projectAllocateRouter); // Project allocation routes
 app.use("/api/login", loginRouter);

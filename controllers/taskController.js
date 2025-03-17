@@ -19,6 +19,7 @@ route.get("/get-task", async(req, res) => {
     try{
         const data = await taskAllocation.find();
         res.status(201).json({data});
+        console.log(data)
     }
     catch(err){
         res.status(400).json({message: err.message})

@@ -16,6 +16,9 @@ import {
   TableBody,
   Container,
   Button,
+  MenuItem,
+  Select,
+  Chip,
 } from "@material-ui/core";
 import Autocomplete from "@mui/material/Autocomplete"; // Updated import for Autocomplete
 import EditIcon from "@material-ui/icons/Edit";
@@ -29,6 +32,13 @@ import { useHistory } from "react-router";
 import Alert from "@material-ui/lab/Alert";
 import { debounce } from "lodash";
 import axios from "axios";
+
+// Define stages and their corresponding colors
+const stages = [
+  { value: "Not Started", color: "red" },
+  { value: "In Progress", color: "yellow" },
+  { value: "Completed", color: "green" },
+];
 
 function ProjectAllocate() {
   const [editModal, setEditModal] = useState(false);
@@ -89,6 +99,7 @@ function ProjectAllocate() {
     registerdate: "",
     description: "",
     plname: "",
+    stage: "Not Started", // Default stage
   });
 
   const updateProject = async (e) => {
@@ -97,15 +108,16 @@ function ProjectAllocate() {
     try {
       const response = await axios.post(
         "http://localhost:4000/api/allocate/create",
-        bookForm, projects._id
+        bookForm
       );
       console.log(response);
       setAlert("Project leader allocated successfully.");
+      setEditModal(false); // Close the modal after successful update
+      getTL(); // Refresh the project list
     } catch (err) {
       console.log(err.message);
       setErrorAlert("Error while allocating project leader.");
     }
-    getTL();
   };
 
   const getTL = async () => {
@@ -130,7 +142,7 @@ function ProjectAllocate() {
 
   const handleSearch = (event) => {
     setSearchTerm(event.target.value);
-  }
+  };
 
   const filteredProjects = projects.filter((project) =>
     project.projectname.toLowerCase().includes(searchTerm.toLowerCase())
@@ -250,6 +262,24 @@ function ProjectAllocate() {
                 }}
               />
             </FormControl>
+
+            {/* Select Stage */}
+            <FormControl margin="normal" fullWidth>
+              <Select
+                value={bookForm.stage}
+                onChange={(e) =>
+                  setBookForm((prev) => ({ ...prev, stage: e.target.value }))
+                }
+                displayEmpty
+                fullWidth
+              >
+                {stages.map((stage) => (
+                  <MenuItem key={stage.value} value={stage.value}>
+                    {stage.value}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
           </Container>
         </DialogContent>
         <DialogActions>
@@ -295,6 +325,7 @@ function ProjectAllocate() {
                     <TableCell>Register Date</TableCell>
                     <TableCell>Description</TableCell>
                     <TableCell>Project Developer</TableCell>
+                    <TableCell>Stage</TableCell>
                     <TableCell align="center">Allocate</TableCell>
                   </TableRow>
                 </TableHead>
@@ -302,7 +333,7 @@ function ProjectAllocate() {
                 <TableBody>
                   {loadingProjects ? (
                     <TableRow>
-                      <TableCell colSpan={8} align="center">
+                      <TableCell colSpan={9} align="center">
                         Loading projects...
                       </TableCell>
                     </TableRow>
@@ -318,6 +349,16 @@ function ProjectAllocate() {
                         <TableCell>
                           {TL.find((t) => t.projectName === book.projectname)?.teamLead ||
                             "Not Allocated"}
+                        </TableCell>
+                        <TableCell>
+                          <Chip
+                            label={book.stage}
+                            style={{
+                              backgroundColor:
+                                stages.find((s) => s.value === book.stage)?.color || "gray",
+                              color: "white",
+                            }}
+                          />
                         </TableCell>
                         <TableCell align="center">
                           <EditIcon

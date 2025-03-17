@@ -26,6 +26,12 @@ const userSchema = new mongoose.Schema({
     type: Date,
     default: new Date().toISOString(),
   },
+  taskAllocations: [
+    {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "TaskAllocation",
+    },
+],
   borrowedBooks: [
     {
       type: mongoose.Schema.Types.ObjectId,

@@ -184,6 +184,21 @@ export const PLListItems = (
     <ListItem
       button
       component={NavLink}
+      to="/projectstatus"
+      exact
+      activeStyle={{
+        backgroundColor: '#ecf0f1',
+      }}
+    >
+      <ListItemIcon>
+        <EventIcon />
+      </ListItemIcon>
+      <ListItemText primary="Project Status" />
+    </ListItem>
+
+    <ListItem
+      button
+      component={NavLink}
       to="/taskallocate"
       exact
       activeStyle={{

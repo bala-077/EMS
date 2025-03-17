@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
-
+import axios from "axios";
 import {
-  // Paper,
   Grid,
   TextField,
   Container,
@@ -16,70 +15,111 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
-  DialogContentText,
   FormControl,
   DialogActions,
+  CircularProgress,
+  Typography,
 } from "@material-ui/core";
+import { makeStyles } from "@material-ui/core/styles";
 import AddIcon from "@material-ui/icons/Add";
-import DeleteIcon from "@material-ui/icons/Delete";
 import EditIcon from "@material-ui/icons/Edit";
-import { formatDate } from "./../../Tools/Tools";
-import { useForm } from "./../../Custom-Hook/userForm";
-import SaveIcon from "@material-ui/icons/Save";
 import Alert from "@material-ui/lab/Alert";
-import CancelOutlinedIcon from "@material-ui/icons/CancelOutlined";
-import {
-  fetchTaskUsers,
-  createUser,
-  editUser,
-  deleteUser,
-} from "./../../Api/Users/Users";
-import { checkToken } from "../../Api/Users/Users";
-import { useHistory } from "react-router";
+import { useForm } from "./../../Custom-Hook/userForm";
+import { checkToken, fetchTaskUsers } from "./../../Api/Users/Users";
+import { useHistory } from "react-router-dom";
+
+// Custom styles using makeStyles
+const useStyles = makeStyles((theme) => ({
+  tableHeader: {
+    backgroundColor: theme.palette.primary.main,
+    color: theme.palette.common.white,
+  },
+  tableRow: {
+    "&:hover": {
+      backgroundColor: theme.palette.action.hover,
+    },
+  },
+  modalTitle: {
+    backgroundColor: theme.palette.primary.main,
+    color: theme.palette.common.white,
+    padding: theme.spacing(2),
+  },
+  modalContent: {
+    padding: theme.spacing(3),
+  },
+  button: {
+    margin: theme.spacing(1),
+  },
+  loadingSpinner: {
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    height: "100vh",
+  },
+}));
 
 function TaskManagement() {
+  const classes = useStyles();
   const [users, setUsers] = useState([]);
   const [userForm, handleChange, setUserForm] = useForm({
-    name: "",
+    userId: "",
     username: "",
-    password: "",
-    userType: "",
+    userType: "Project Leader",
+    taskdate: "",
+    taskdesc: "",
+    status: "Pending",
   });
   const [createModal, setCreateModal] = useState(false);
   const [isEdit, setIsEdit] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [errorAlert, setErrorAlert] = useState("");
   const [alert, setAlert] = useState("");
-  const [deleteAlert, setDeleteAlert] = useState(false);
   const [userType, setUserType] = useState(null);
+  const [tasks, setTasks] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   const history = useHistory();
+
+  const getTask = async () => {
+    try {
+      const response = await axios.get("http://localhost:4000/api/allocate/get-task");
+      setTasks(response.data.data); // Store tasks in state
+      setLoading(false);
+    } catch (err) {
+      console.log(err.message);
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     let isCancelled = false;
     const fetchApi = async () => {
-      const res = await checkToken();
-      if (res === undefined) history.push("/");
-      else if (res.status === 401) history.push("/");
-
-      if (!isCancelled) {
-        setUserType(res.data.userType);
+      try {
+        const res = await checkToken();
+        if (res === undefined || res.status === 401) {
+          history.push("/");
+        } else if (!isCancelled) {
+          setUserType(res.data.userType);
+        }
+      } catch (e) {
+        console.log(e);
       }
     };
-    try {
-      fetchApi();
-    } catch (e) {
-      console.log(e);
-    }
+    fetchApi();
     return () => (isCancelled = true);
   }, [history]);
 
   useEffect(() => {
+    getTask(); // Fetch tasks
     let isCancelled = false;
     const fetchApi = async () => {
-      const res = await fetchTaskUsers();
-      if (!isCancelled) {
-        setUsers(res);
+      try {
+        const res = await fetchTaskUsers();
+        if (!isCancelled) {
+          setUsers(res); // Set users in state
+        }
+      } catch (e) {
+        console.log(e);
       }
     };
     fetchApi();
@@ -89,28 +129,51 @@ function TaskManagement() {
   const registerUser = async (e) => {
     e.preventDefault();
     setProcessing(true);
-    const res = isEdit ? await editUser(userForm) : await createUser(userForm);
 
-    if (res.status === 200 || res.status === 201) {
-      setCreateModal(false);
-      if (isEdit) {
-        setUsers(
-          users.map((user) => (user.id === res.data.id ? res.data : user))
-        );
-        setAlert(<Alert severity="success">Successfully edited User.</Alert>);
+    try {
+      const taskData = {
+        userId: userForm.userId,
+        plname: userForm.username,
+        type: userForm.userType,
+        taskDate: userForm.taskdate,
+        desc: userForm.taskdesc,
+        status: userForm.status || "Pending",
+      };
+      console.log("Sending payload:", taskData);
+
+      const res = await axios.post("http://localhost:4000/api/allocate/create-task", taskData);
+
+      console.log("Response from server:", res.data);
+
+      if (res.status === 200 || res.status === 201) {
+        setCreateModal(false);
+        if (isEdit) {
+          setUsers(users.map((user) => (user.id === res.data.id ? res.data : user)));
+          setAlert(<Alert severity="success">Successfully edited Task.</Alert>);
+        } else {
+          setUsers([res.data, ...users]);
+          setAlert(<Alert severity="success">Successfully added new Task.</Alert>);
+        }
+        getTask(); // Refresh tasks
+
+        setTimeout(() => {
+          setAlert("");
+        }, 5000);
       } else {
-        setUsers([res.data, ...users]);
-        setAlert(
-          <Alert severity="success">Successfully added new User.</Alert>
+        setErrorAlert(
+          <Alert style={{ textTransform: "capitalize" }} severity="error">
+            {res.data.error}
+          </Alert>
         );
+        setTimeout(() => {
+          setErrorAlert("");
+        }, 10000);
       }
-      setTimeout(() => {
-        setAlert("");
-      }, 5000);
-    } else {
+    } catch (err) {
+      console.error("Error:", err.response?.data || err.message);
       setErrorAlert(
         <Alert style={{ textTransform: "capitalize" }} severity="error">
-          {res.data.error}
+          {err.response?.data?.error || err.message || "An error occurred."}
         </Alert>
       );
       setTimeout(() => {
@@ -120,60 +183,59 @@ function TaskManagement() {
 
     setProcessing(false);
   };
-  const destroyUser = async () => {
-    setProcessing(true);
-    const res = await deleteUser(userForm);
-    if (res.status === 200 || res.status === 204) {
-      setProcessing(false);
-      setDeleteAlert(false);
-      setUsers(users.filter((user) => user.id !== userForm.id));
-      setUserForm({ username: "", name: "", password: "", userType: "" });
-      setErrorAlert(
-        <Alert style={{ textTransform: "capitalize" }} severity="error">
-          You Have Successfully Deleted User.
-        </Alert>
-      );
-      setTimeout(() => {
-        setErrorAlert("");
-      }, 10000);
-    }
-  };
 
-  //Dialogs
   const addDialog = (
     <Dialog
       open={createModal}
       onClose={() => {
         setCreateModal(false);
         setUserForm({
-          name: "",
+          userId: "",
           username: "",
-          password: "",
           userType: "Project Leader",
+          taskdate: "",
+          taskdesc: "",
+          status: "Pending",
         });
       }}
       scroll="body"
       fullWidth
     >
-      <form onSubmit={registerUser} method="post">
-        <Container>
-          <DialogTitle className="mt-2">
-            {isEdit ? "Allocate" : "Add"}
-            Task
-          </DialogTitle>
-        </Container>
-        <DialogContent>
+      <DialogTitle className={classes.modalTitle}>
+        {isEdit ? "Allocate Task" : "Add Task"}
+      </DialogTitle>
+      <DialogContent className={classes.modalContent}>
+        <form onSubmit={registerUser} method="post">
           <Container>
             {errorAlert}
             <FormControl margin="normal" fullWidth>
               <TextField
                 required
+                disabled
+                InputProps={{
+                  readOnly: true, // Correct way to set readonly
+                }}
                 name="name"
                 onChange={handleChange}
-                value={userForm.name}
-                label="Name"
+                value={userForm.id}
+                label="User ID"
                 type="text"
                 fullWidth
+              />
+            </FormControl>
+            <FormControl margin="normal" fullWidth>
+              <TextField
+                required
+                name="username"
+                disabled // This maps to plname in the backend
+                onChange={handleChange}
+                value={userForm.username}
+                label="Developer Name"
+                type="text"
+                fullWidth
+                InputProps={{
+                  readOnly: true, // Correct way to set readonly
+                }}
               />
             </FormControl>
             <FormControl margin="normal" fullWidth>
@@ -183,9 +245,9 @@ function TaskManagement() {
                 onChange={handleChange}
                 label="Task Date"
                 type="date"
-                value={userForm.taskdate || ""} // Ensure it has a default value
+                value={userForm.taskdate || ""}
                 fullWidth
-                InputLabelProps={{ shrink: true }} // Ensures label stays above
+                InputLabelProps={{ shrink: true }}
               />
             </FormControl>
             <FormControl margin="normal" fullWidth>
@@ -193,167 +255,119 @@ function TaskManagement() {
                 required
                 name="taskdesc"
                 onChange={handleChange}
-                value={userForm.taskdesc || ""} // Ensure correct state variable
+                value={userForm.taskdesc || ""}
                 label="Description"
                 type="text"
                 multiline
-                rows={4} // Adjust as needed
+                rows={4}
                 fullWidth
               />
             </FormControl>
           </Container>
-        </DialogContent>
-
-        <DialogActions>
-          <Container>
-            {!isEdit ? (
-              <Button
-                id="addBtn"
-                variant="contained"
-                color="primary"
-                endIcon={<AddIcon />}
-                disabled={processing}
-                style={{ marginBottom: "20px" }}
-                size="large"
-                type="submit"
-                fullWidth
-              >
-                Add
-              </Button>
-            ) : (
-              <Button
-                id="editBtn"
-                variant="contained"
-                color="primary"
-                style={{ marginBottom: "20px" }}
-                endIcon={<SaveIcon />}
-                disabled={processing}
-                size="large"
-                fullWidth
-                type="submit"
-              >
-                Allocate
-              </Button>
-            )}
-          </Container>
-        </DialogActions>
-      </form>
+          <DialogActions>
+            <Button
+              variant="contained"
+              color="secondary"
+              onClick={() => setCreateModal(false)}
+              className={classes.button}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="contained"
+              color="primary"
+              endIcon={<AddIcon />}
+              disabled={processing}
+              className={classes.button}
+            >
+              {isEdit ? "Save Task" : "Add Task"}
+            </Button>
+          </DialogActions>
+        </form>
+      </DialogContent>
     </Dialog>
   );
-  const deleteDialog = (
-    <div>
-      <Dialog
-        open={deleteAlert}
-        onClose={() => {
-          setUserForm({ username: "", name: "", password: "", userType: "" });
-          setDeleteAlert(false);
-        }}
-        maxWidth={"xs"}
-        aria-labelledby="alert-dialog-title"
-        aria-describedby="alert-dialog-description"
-      >
-        <DialogContent>
-          <CancelOutlinedIcon
-            style={{
-              color: "#e74c3c",
-              marginLeft: "auto",
-              marginRight: "auto",
-              textAlign: "center",
-              display: "block",
-              fontSize: "250px",
-            }}
-          />
-          <DialogContentText
-            style={{ textAlign: "center" }}
-            id="alert-dialog-description"
-          >
-            Are you sure you want to delete <strong>{userForm.username}</strong>
-            ?
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button
-            onClick={() => {
-              destroyUser();
-            }}
-            disabled={processing}
-            color="primary"
-          >
-            Proceed
-          </Button>
-          <Button
-            color="primary"
-            autoFocus
-            onClick={() => {
-              setUserForm({
-                username: "",
-                name: "",
-                password: "",
-                userType: "",
-              });
-              setDeleteAlert(false);
-            }}
-          >
-            No
-          </Button>
-        </DialogActions>
-      </Dialog>
-    </div>
-  );
+
+  if (loading) {
+    return (
+      <div className={classes.loadingSpinner}>
+        <CircularProgress />
+      </div>
+    );
+  }
 
   return (
-    <div>
-      <Container>
-        <Grid container spacing={1}></Grid>
-        <Grid container style={{ marginTop: "30px" }}>
-          <Grid item xs={12}>
-            {alert}
-            <TableContainer component={Paper}>
-              <Table aria-label="simple table">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Name</TableCell>
-                    <TableCell>Type</TableCell>
-                    <TableCell>Username</TableCell>
-                    <TableCell>Task Status</TableCell>
-                    <TableCell>Allocate Task</TableCell>
+    <Container>
+      <Grid container style={{ marginTop: "30px" }}>
+        <Grid item xs={12}>
+          {alert}
+          <TableContainer component={Paper}>
+            <Table aria-label="simple table">
+              <TableHead>
+                <TableRow className={classes.tableHeader}>
+                  <TableCell style={{ color: "white" }}>Name</TableCell>
+                  <TableCell style={{ color: "white" }}>Task Type</TableCell>
+                  <TableCell style={{ color: "white" }}>Task Link</TableCell>
+                  <TableCell style={{ color: "white" }}>Task Status</TableCell>
+                  <TableCell style={{ color: "white" }}>Allocate Task</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {users.map((user) => (
+                  <TableRow key={user.id} className={classes.tableRow}>
+                    <TableCell>{user.name}</TableCell>
+                    <TableCell>{user.userType}</TableCell>
+                    <TableCell>
+                      {tasks
+                        .filter((task) => task.userId === user.id)
+                        .map((task) =>
+                          task.desc && (
+                            <a
+                              href={task.desc.startsWith("http") ? task.desc : `https://${task.desc}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{ color: "blue", textDecoration: "underline" }}
+                              key={task.id}
+                            >
+                              {task.desc}
+                            </a>
+                          )
+                        )}
+                    </TableCell>
+                    <TableCell>
+                      {tasks
+                        .filter((task) => task.userId === user.id)
+                        .map((task) => (
+                          <div key={task.id}>{task.status || "Not Available"}</div>
+                        ))}
+                    </TableCell>
+                    {userType === "PL" && (
+                      <TableCell align="right">
+                        <EditIcon
+                          style={{
+                            color: "#27ae60",
+                            marginLeft: "5px",
+                            cursor: "pointer",
+                          }}
+                          onClick={() => {
+                            setIsEdit(true);
+                            setUserForm(user);
+                            setCreateModal(true);
+                          }}
+                        />
+                      </TableCell>
+                    )}
                   </TableRow>
-                </TableHead>
-                <TableBody>
-                  {users.map((user) => (
-                    <TableRow key={user.id}>
-                      <TableCell>{user.name}</TableCell>
-                      <TableCell>{user.userType}</TableCell>
-                      <TableCell>{user.username}</TableCell>
-                      <TableCell>Complete</TableCell>
-
-                      {userType === "PL" && (
-                        <TableCell align="">
-                          <EditIcon
-                            style={{
-                              color: "#27ae60",
-                              marginLeft: "5px",
-                              cursor: "pointer",
-                            }}
-                            onClick={() => {
-                              setIsEdit(true);
-                              setUserForm(user);
-                              setCreateModal(true);
-                            }}
-                          />
-                        </TableCell>
-                      )}
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </Grid>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
         </Grid>
-        {addDialog}
-        {deleteDialog}
-      </Container>
-    </div>
+      </Grid>
+      {addDialog}
+    </Container>
   );
 }
+
 export default TaskManagement;

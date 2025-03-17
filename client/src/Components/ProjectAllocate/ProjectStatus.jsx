@@ -100,6 +100,7 @@ const ProjectStatus = () => {
         "http://localhost:4000/api/allocate/get-status"
       ); // Your API endpoint
       setData(response.data.data);
+      console.log(response.data);
       setLoading(false); // Set loading to false when data is fetched
     } catch (err) {
       console.error(err.message);
