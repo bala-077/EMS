@@ -18,6 +18,8 @@ import ProjectStatus from './Components/ProjectAllocate/ProjectStatus'
 import LeadAllocation from './Components/ProjectAllocate/LeadAllocation'
 import UserContext from './Components/context/userContext'
 import LeadStatus from './Components/ProjectAllocate/LeadStatus'
+import DeveloperProject from './Components/ProjectAllocate/DeveloperProject'
+import GetTask from './Components/ProjectAllocate/GetTask'
 export default function App() {
   const [data, setData] = useState('')
   return (
@@ -83,9 +85,23 @@ export default function App() {
                   <LeadStatus />
                 </Nav>
               </Route>
+
               <Route path="/taskallocate" exact>
                 <Nav>
                   <TaskAllocate />
+                </Nav>
+              </Route>
+
+              <Route path="/get-task" exact>
+                <Nav>
+                  <GetTask />
+                </Nav>
+              </Route>
+
+
+              <Route path="/developerproject" exact>
+                <Nav>
+                  <DeveloperProject />
                 </Nav>
               </Route>
               <Route path="/feedback" exact>

@@ -252,7 +252,7 @@ export const PDListItems = (
     <ListItem
       button
       component={NavLink}
-      to="/projectallocated"
+      to="/developerproject"
       exact
       activeStyle={{
         backgroundColor: '#ecf0f1',
@@ -263,12 +263,10 @@ export const PDListItems = (
       </ListItemIcon>
       <ListItemText primary="Project Allocated" />
     </ListItem>
-
-
     <ListItem
       button
       component={NavLink}
-      to="/gettodaytask"
+      to="/get-task"
       exact
       activeStyle={{
         backgroundColor: '#ecf0f1',
@@ -277,10 +275,8 @@ export const PDListItems = (
       <ListItemIcon>
         <EventIcon />
       </ListItemIcon>
-      <ListItemText primary="Get Today Task" />
+      <ListItemText primary="Project Allocated" />
     </ListItem>
-
-    
   
   </div>
 )
