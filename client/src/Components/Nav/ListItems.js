@@ -184,7 +184,7 @@ export const PLListItems = (
     <ListItem
       button
       component={NavLink}
-      to="/projectstatus"
+      to="/leadstatus"
       exact
       activeStyle={{
         backgroundColor: '#ecf0f1',

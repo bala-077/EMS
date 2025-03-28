@@ -33,12 +33,6 @@ import Alert from "@material-ui/lab/Alert";
 import { debounce } from "lodash";
 import axios from "axios";
 
-// Define stages and their corresponding colors
-const stages = [
-  { value: "Not Started", color: "red" },
-  { value: "In Progress", color: "yellow" },
-  { value: "Completed", color: "green" },
-];
 
 function ProjectAllocate() {
   const [editModal, setEditModal] = useState(false);
@@ -49,8 +43,12 @@ function ProjectAllocate() {
   const [userType, setUserType] = useState(null);
   const [users, setUsers] = useState([]);
   const [loadingProjects, setLoadingProjects] = useState(true);
-  const [loadingUsers, setLoadingUsers] = useState(true);
+  const [loadingUsers, setLoadingUsers] = useState(true)
   const [searchTerm, setSearchTerm] = useState(""); // State for search term
+  const [storeData, setStoredata] = useState("");
+  console.log(storeData, "usersdata");
+  console.log(projects, "projects")
+
   const history = useHistory();
   const [TL, setTL] = useState([
     {
@@ -59,7 +57,25 @@ function ProjectAllocate() {
     },
   ]);
 
+  const getDatas = () => {
+    const result = sessionStorage.getItem("user");
+    
+    if (result) {
+      try {
+        const { username } = JSON.parse(result);
+        setStoredata(username);
+      } catch (error) {
+        console.error("Error parsing user data:", error);
+        setErrorAlert("Failed to load user data");
+      }
+    } else {
+      console.log("No user data found in sessionStorage");
+      setErrorAlert("No user session found");
+    }
+  };
+
   useEffect(() => {
+    getDatas();
     let isCancelled = false;
 
     const fetchApi = async () => {
@@ -112,7 +128,7 @@ function ProjectAllocate() {
       );
       console.log(response);
       setAlert("Project leader allocated successfully.");
-      setEditModal(false); // Close the modal after successful update
+      setEditModal(false); 
       getTL(); // Refresh the project list
     } catch (err) {
       console.log(err.message);
@@ -131,10 +147,13 @@ function ProjectAllocate() {
           teamLead: item.plname,
         }))
       );
+      console.log(response, "responeData 2")
     } catch (err) {
       console.log(err.message);
     }
   };
+
+  const filterData = 
 
   useEffect(() => {
     getTL();
@@ -264,22 +283,6 @@ function ProjectAllocate() {
             </FormControl>
 
             {/* Select Stage */}
-            <FormControl margin="normal" fullWidth>
-              <Select
-                value={bookForm.stage}
-                onChange={(e) =>
-                  setBookForm((prev) => ({ ...prev, stage: e.target.value }))
-                }
-                displayEmpty
-                fullWidth
-              >
-                {stages.map((stage) => (
-                  <MenuItem key={stage.value} value={stage.value}>
-                    {stage.value}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
           </Container>
         </DialogContent>
         <DialogActions>
@@ -324,8 +327,7 @@ function ProjectAllocate() {
                     <TableCell>Duration</TableCell>
                     <TableCell>Register Date</TableCell>
                     <TableCell>Description</TableCell>
-                    <TableCell>Project Developer</TableCell>
-                    <TableCell>Stage</TableCell>
+                    <TableCell>Project Lead</TableCell>
                     <TableCell align="center">Allocate</TableCell>
                   </TableRow>
                 </TableHead>
@@ -349,16 +351,6 @@ function ProjectAllocate() {
                         <TableCell>
                           {TL.find((t) => t.projectName === book.projectname)?.teamLead ||
                             "Not Allocated"}
-                        </TableCell>
-                        <TableCell>
-                          <Chip
-                            label={book.stage}
-                            style={{
-                              backgroundColor:
-                                stages.find((s) => s.value === book.stage)?.color || "gray",
-                              color: "white",
-                            }}
-                          />
                         </TableCell>
                         <TableCell align="center">
                           <EditIcon

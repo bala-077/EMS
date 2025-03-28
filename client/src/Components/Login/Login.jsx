@@ -1,76 +1,80 @@
-import React, { useState } from 'react'
-import Avatar from '@material-ui/core/Avatar'
-import Button from '@material-ui/core/Button'
-import CssBaseline from '@material-ui/core/CssBaseline'
-import TextField from '@material-ui/core/TextField'
+import React, { useContext, useState } from "react";
+import Avatar from "@material-ui/core/Avatar";
+import Button from "@material-ui/core/Button";
+import CssBaseline from "@material-ui/core/CssBaseline";
+import TextField from "@material-ui/core/TextField";
 // import Box from '@material-ui/core/Box';
-import LockOutlinedIcon from '@material-ui/icons/LockOutlined'
-import Typography from '@material-ui/core/Typography'
-import { Link } from '@material-ui/core'
-import { makeStyles } from '@material-ui/core/styles'
-import Container from '@material-ui/core/Container'
-import { useHistory } from 'react-router-dom'
+import LockOutlinedIcon from "@material-ui/icons/LockOutlined";
+import Typography from "@material-ui/core/Typography";
+import { Link } from "@material-ui/core";
+import { makeStyles } from "@material-ui/core/styles";
+import Container from "@material-ui/core/Container";
+import { useHistory } from "react-router-dom";
 // import {loginUser} from './../../Api/users';
 // import { Alert } from '@material-ui/lab';
-import { FormControl, InputLabel, MenuItem, Select } from '@material-ui/core'
-import { useForm } from './../../Custom-Hook/userForm'
-import { loginUser } from './../../Api/Users/Users'
-import Alert from '@material-ui/lab/Alert'
+import { FormControl, InputLabel, MenuItem, Select } from "@material-ui/core";
+import { useForm } from "./../../Custom-Hook/userForm";
+import { loginUser } from "./../../Api/Users/Users";
+import Alert from "@material-ui/lab/Alert";
+import { userData } from "../context/userContext";
 
 const useStyles = makeStyles((theme) => ({
   paper: {
     marginTop: theme.spacing(8),
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
   },
   avatar: {
     margin: theme.spacing(1),
     backgroundColor: theme.palette.secondary.main,
   },
   form: {
-    width: '100%', // Fix IE 11 issue.
+    width: "100%", // Fix IE 11 issue.
     marginTop: theme.spacing(1),
   },
   submit: {
     margin: theme.spacing(3, 0, 2),
   },
-}))
+}));
 
 export default function Login() {
-  const classes = useStyles()
-  const history = useHistory()
+  const {setData}  = useContext(userData);
+  console.log(setData)
+  const classes = useStyles();
+  const history = useHistory();
 
   const [values, handleChange] = useForm({
-    username: '',
-    password: '',
-    usertype: '',
-  })
-  const [alert, setAlert] = useState('')
+    username: "",
+    password: "",
+    usertype: "",
+  });
+  const [alert, setAlert] = useState("");
 
   const login = async (e) => {
-    e.preventDefault()
-    setAlert('')
+    e.preventDefault();
+    setAlert("");
 
     try {
-      const res = await loginUser(values)
+      const res = await loginUser(values);
       if (res.status === 200) {
-        const { token } = res.data
-        sessionStorage.setItem('userToken', token);
-        console.log('userToken', token)
-        history.push('/dashboard')
+        const { token } = res.data;
+        sessionStorage.setItem("userToken", token);
+        console.log("userToken", token);
+        setData(res);
+        history.push("/dashboard");
       } else {
         setAlert(
-          <Alert style={{ marginBottom: '20px' }} severity="error">
+          <Alert style={{ marginBottom: "20px" }} severity="error">
             Incorrect username, usertype or password. Pls Try Again
           </Alert>
-        )
+        );
         setTimeout(() => {
-          setAlert('')
-        }, 10000)
+          setAlert("");
+        }, 10000);
       }
     } catch (e) {}
-  }
+  };
 
   return (
     <Container component="main" maxWidth="xs">
@@ -83,7 +87,6 @@ export default function Login() {
         <Typography component="h1" variant="h5">
           Sign in
         </Typography>
-        
 
         <form onSubmit={login} className={classes.form}>
           {alert}
@@ -103,12 +106,11 @@ export default function Login() {
               <MenuItem value="" selected>
                 <em>--Select User Type--</em>
               </MenuItem>
-             
-              <MenuItem value={'admin'}>Admin</MenuItem>
-              <MenuItem value={'PM'}>Project Manager</MenuItem>
-              <MenuItem value={'PL'}>Project Leader</MenuItem>
-              <MenuItem value={'PD'}>Project Developer</MenuItem>
 
+              <MenuItem value={"admin"}>Admin</MenuItem>
+              <MenuItem value={"PM"}>Project Manager</MenuItem>
+              <MenuItem value={"PL"}>Project Leader</MenuItem>
+              <MenuItem value={"PD"}>Project Developer</MenuItem>
             </Select>
           </FormControl>
           <TextField
@@ -153,5 +155,5 @@ export default function Login() {
         <Copyright />
       </Box> */}
     </Container>
-  )
+  );
 }

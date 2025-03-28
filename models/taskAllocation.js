@@ -3,29 +3,37 @@ const mongoose = require('mongoose');
 const taskSchema = new mongoose.Schema({
     userId: {
         type: String,
-        required: true, // Ensure userId is required
+        required: true,
     },
     plname: {
         type: String,
-        required: true, // Ensure plname is required
+        required: true,
     },
     type: {
         type: String,
-        required: true, // Ensure type is required
+        required: true,
     },
     taskDate: {
-        type: String,
-        required: true, // Ensure taskDate is required
+        type: Date,
+        required: true,
     },
     desc: {
         type: String,
-        required: true, // Ensure desc is required
+        required: true,
     },
     status: {
         type: String,
-        default: "Pending", // Default status if not provided
+        enum: ["Pending", "In Progress", "Completed"],
+        default: "Pending",
     },
-});
+    allocatedBy: {
+        type: String,
+        required: true
+    },
+    completedAt: {
+        type: Date
+    }
+}, { timestamps: true });
 
 const TaskAllocation = mongoose.model('TaskAllocation', taskSchema);
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useContext, useEffect, useState } from 'react'
 import clsx from 'clsx'
 import CssBaseline from '@material-ui/core/CssBaseline'
 import Drawer from '@material-ui/core/Drawer'
@@ -20,13 +20,14 @@ import { useStyles } from './Nav.style'
 import ExitToAppIcon from '@material-ui/icons/ExitToApp'
 import { useHistory } from 'react-router'
 import { checkToken } from './../../Api/Users/Users'
+import { userData } from '../context/userContext'
 
 export default function Nav(props) {
+  const { username, setUsername } = useContext(userData);
   const classes = useStyles()
   const [open, setOpen] = useState(true)
   const history = useHistory()
   const [userType, setUserType] = useState(null)
-  const [username, setUsername] = useState(null)
 
   useEffect(() => {
     let isCancelled = false

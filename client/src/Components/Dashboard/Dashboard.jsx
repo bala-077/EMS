@@ -4,7 +4,7 @@ import { checkToken } from '../../Api/Users/Users'
 import { useHistory } from 'react-router'
 import { adminDashboard } from './AdminDashboard'
 import { studentDashboard } from './StudentDashboard'
-import { leaderDashboard } from './LeaderDashboard'
+import LeaderDashboard from './LeaderDashboard'
 import { developerDashboard } from './DeveloperDashboard'
 
 const Dashboard = () => {
@@ -72,7 +72,7 @@ const Dashboard = () => {
     })
   } 
   else if (userType === 'PL') {
-    return leaderDashboard({
+    return LeaderDashboard({
       counts,
       PMrecentAddedBooks,
       PMrecentAddedStudents,

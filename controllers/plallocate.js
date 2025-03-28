@@ -9,7 +9,7 @@ projectAllocateRouter.get('/create', async (req, res) => {
     // Use map to extract plname and projectname from each document
     const projectData = data.map(item => ({
       plname: item.plname,
-      projectname: item.projectname
+      projectname: item.projectname,
     }));
     res.json(projectData);
   } catch (err) {

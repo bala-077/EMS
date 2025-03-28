@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import axios from "axios";
 import {
   Grid,
@@ -19,17 +19,33 @@ import {
   DialogActions,
   CircularProgress,
   Typography,
+  Snackbar,
+  IconButton,
+  Avatar,
+  Chip,
+  Box
 } from "@material-ui/core";
 import { makeStyles } from "@material-ui/core/styles";
-import AddIcon from "@material-ui/icons/Add";
-import EditIcon from "@material-ui/icons/Edit";
+import {
+  Add as AddIcon,
+  Edit as EditIcon,
+  Feedback as FeedbackIcon,
+  Person as PersonIcon
+} from "@material-ui/icons";
 import Alert from "@material-ui/lab/Alert";
 import { useForm } from "./../../Custom-Hook/userForm";
 import { checkToken, fetchTaskUsers } from "./../../Api/Users/Users";
 import { useHistory } from "react-router-dom";
+import { userData } from "../context/userContext";
 
-// Custom styles using makeStyles
 const useStyles = makeStyles((theme) => ({
+  root: {
+    marginTop: theme.spacing(4),
+    padding: theme.spacing(3),
+  },
+  header: {
+    marginBottom: theme.spacing(4),
+  },
   tableHeader: {
     backgroundColor: theme.palette.primary.main,
     color: theme.palette.common.white,
@@ -42,10 +58,10 @@ const useStyles = makeStyles((theme) => ({
   modalTitle: {
     backgroundColor: theme.palette.primary.main,
     color: theme.palette.common.white,
-    padding: theme.spacing(2),
+    padding: theme.spacing(3),
   },
   modalContent: {
-    padding: theme.spacing(3),
+    padding: theme.spacing(4),
   },
   button: {
     margin: theme.spacing(1),
@@ -56,10 +72,32 @@ const useStyles = makeStyles((theme) => ({
     alignItems: "center",
     height: "100vh",
   },
+  actionButton: {
+    marginLeft: theme.spacing(1),
+  },
+  taskLink: {
+    color: theme.palette.primary.main,
+    textDecoration: 'underline',
+    '&:hover': {
+      textDecoration: 'none',
+    },
+  },
+  userCell: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: theme.spacing(2),
+  },
+  roleChip: {
+    marginLeft: theme.spacing(1),
+  },
+  statusChip: {
+    marginRight: theme.spacing(1),
+  },
 }));
 
 function TaskManagement() {
   const classes = useStyles();
+  const { username } = useContext(userData);
   const [users, setUsers] = useState([]);
   const [userForm, handleChange, setUserForm] = useForm({
     userId: "",
@@ -68,26 +106,34 @@ function TaskManagement() {
     taskdate: "",
     taskdesc: "",
     status: "Pending",
+    allocatedBy: username
   });
   const [createModal, setCreateModal] = useState(false);
   const [isEdit, setIsEdit] = useState(false);
   const [processing, setProcessing] = useState(false);
-  const [errorAlert, setErrorAlert] = useState("");
-  const [alert, setAlert] = useState("");
+  const [alert, setAlert] = useState({ open: false, message: "", severity: "success" });
   const [userType, setUserType] = useState(null);
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [feedbackModal, setFeedbackModal] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [dateError, setDateError] = useState("");
 
   const history = useHistory();
 
   const getTask = async () => {
     try {
       const response = await axios.get("http://localhost:4000/api/allocate/get-task");
-      setTasks(response.data.data); // Store tasks in state
+      setTasks(response.data.data);
       setLoading(false);
     } catch (err) {
-      console.log(err.message);
+      console.error("Error fetching tasks:", err);
       setLoading(false);
+      setAlert({
+        open: true,
+        message: "Failed to load tasks",
+        severity: "error"
+      });
     }
   };
 
@@ -100,9 +146,10 @@ function TaskManagement() {
           history.push("/");
         } else if (!isCancelled) {
           setUserType(res.data.userType);
+          console.log("User type set to:", res.data.userType);
         }
       } catch (e) {
-        console.log(e);
+        console.error("Auth error:", e);
       }
     };
     fetchApi();
@@ -110,25 +157,39 @@ function TaskManagement() {
   }, [history]);
 
   useEffect(() => {
-    getTask(); // Fetch tasks
+    getTask();
     let isCancelled = false;
     const fetchApi = async () => {
       try {
         const res = await fetchTaskUsers();
         if (!isCancelled) {
-          setUsers(res); // Set users in state
+          setUsers(res);
         }
       } catch (e) {
-        console.log(e);
+        console.error("Error fetching users:", e);
       }
     };
     fetchApi();
     return () => (isCancelled = true);
   }, []);
 
+  const checkTaskExists = (userId, date) => {
+    return tasks.some(task => 
+      task.userId === userId && 
+      new Date(task.taskDate).toDateString() === new Date(date).toDateString()
+    );
+  };
+
   const registerUser = async (e) => {
     e.preventDefault();
     setProcessing(true);
+
+    // Validate one task per day
+    if (checkTaskExists(userForm.userId, userForm.taskdate)) {
+      setDateError("This user already has a task assigned for this date");
+      setProcessing(false);
+      return;
+    }
 
     try {
       const taskData = {
@@ -138,50 +199,53 @@ function TaskManagement() {
         taskDate: userForm.taskdate,
         desc: userForm.taskdesc,
         status: userForm.status || "Pending",
+        allocatedBy: username,
       };
-      console.log("Sending payload:", taskData);
 
       const res = await axios.post("http://localhost:4000/api/allocate/create-task", taskData);
 
-      console.log("Response from server:", res.data);
-
       if (res.status === 200 || res.status === 201) {
         setCreateModal(false);
-        if (isEdit) {
-          setUsers(users.map((user) => (user.id === res.data.id ? res.data : user)));
-          setAlert(<Alert severity="success">Successfully edited Task.</Alert>);
-        } else {
-          setUsers([res.data, ...users]);
-          setAlert(<Alert severity="success">Successfully added new Task.</Alert>);
-        }
-        getTask(); // Refresh tasks
-
-        setTimeout(() => {
-          setAlert("");
-        }, 5000);
-      } else {
-        setErrorAlert(
-          <Alert style={{ textTransform: "capitalize" }} severity="error">
-            {res.data.error}
-          </Alert>
-        );
-        setTimeout(() => {
-          setErrorAlert("");
-        }, 10000);
+        setAlert({
+          open: true,
+          message: isEdit ? "Task updated successfully" : "Task assigned successfully",
+          severity: "success"
+        });
+        getTask();
+        setUserForm({
+          userId: "",
+          username: "",
+          userType: "Project Leader",
+          taskdate: "",
+          taskdesc: "",
+          status: "Pending",
+          allocatedBy: username
+        });
       }
     } catch (err) {
       console.error("Error:", err.response?.data || err.message);
-      setErrorAlert(
-        <Alert style={{ textTransform: "capitalize" }} severity="error">
-          {err.response?.data?.error || err.message || "An error occurred."}
-        </Alert>
-      );
-      setTimeout(() => {
-        setErrorAlert("");
-      }, 10000);
+      setAlert({
+        open: true,
+        message: err.response?.data?.error || err.message || "An error occurred",
+        severity: "error"
+      });
+    } finally {
+      setProcessing(false);
     }
+  };
 
-    setProcessing(false);
+  const handleCloseAlert = () => {
+    setAlert({ ...alert, open: false });
+  };
+
+  const handleDateChange = (e) => {
+    const date = e.target.value;
+    setDateError("");
+    handleChange(e);
+    
+    if (userForm.userId && checkTaskExists(userForm.userId, date)) {
+      setDateError("This user already has a task assigned for this date");
+    }
   };
 
   const addDialog = (
@@ -196,79 +260,79 @@ function TaskManagement() {
           taskdate: "",
           taskdesc: "",
           status: "Pending",
+          allocatedBy: username
         });
+        setDateError("");
       }}
       scroll="body"
       fullWidth
+      maxWidth="sm"
     >
       <DialogTitle className={classes.modalTitle}>
-        {isEdit ? "Allocate Task" : "Add Task"}
+        {isEdit ? "Edit Task" : "Assign New Task"}
       </DialogTitle>
       <DialogContent className={classes.modalContent}>
         <form onSubmit={registerUser} method="post">
-          <Container>
-            {errorAlert}
-            <FormControl margin="normal" fullWidth>
+          <Grid container spacing={3}>
+            <Grid item xs={12}>
               <TextField
                 required
-                disabled
-                InputProps={{
-                  readOnly: true, // Correct way to set readonly
-                }}
-                name="name"
-                onChange={handleChange}
-                value={userForm.id}
+                name="userId"
+                value={userForm.userId}
                 label="User ID"
                 type="text"
                 fullWidth
+                InputProps={{ readOnly: true }}
               />
-            </FormControl>
-            <FormControl margin="normal" fullWidth>
+            </Grid>
+            <Grid item xs={12}>
               <TextField
                 required
                 name="username"
-                disabled // This maps to plname in the backend
-                onChange={handleChange}
                 value={userForm.username}
                 label="Developer Name"
                 type="text"
                 fullWidth
-                InputProps={{
-                  readOnly: true, // Correct way to set readonly
-                }}
+                InputProps={{ readOnly: true }}
               />
-            </FormControl>
-            <FormControl margin="normal" fullWidth>
+            </Grid>
+            <Grid item xs={12}>
               <TextField
                 required
                 name="taskdate"
-                onChange={handleChange}
+                onChange={handleDateChange}
                 label="Task Date"
                 type="date"
                 value={userForm.taskdate || ""}
                 fullWidth
                 InputLabelProps={{ shrink: true }}
+                error={!!dateError}
+                helperText={dateError}
               />
-            </FormControl>
-            <FormControl margin="normal" fullWidth>
+            </Grid>
+            <Grid item xs={12}>
               <TextField
                 required
                 name="taskdesc"
                 onChange={handleChange}
                 value={userForm.taskdesc || ""}
-                label="Description"
+                label="Task Description"
                 type="text"
                 multiline
                 rows={4}
                 fullWidth
+                placeholder="Enter task details or link"
               />
-            </FormControl>
-          </Container>
-          <DialogActions>
+            </Grid>
+          </Grid>
+          <DialogActions className={classes.actionButtons}>
             <Button
-              variant="contained"
+              variant="outlined"
               color="secondary"
-              onClick={() => setCreateModal(false)}
+              onClick={() => {
+                setCreateModal(false);
+                setDateError("");
+              }}
               className={classes.button}
             >
               Cancel
@@ -277,11 +341,11 @@ function TaskManagement() {
               type="submit"
               variant="contained"
               color="primary"
-              endIcon={<AddIcon />}
-              disabled={processing}
+              endIcon={processing ? <CircularProgress size={20} /> : <AddIcon />}
+              disabled={processing || !!dateError}
               className={classes.button}
             >
-              {isEdit ? "Save Task" : "Add Task"}
+              {isEdit ? "Update Task" : "Assign Task"}
             </Button>
           </DialogActions>
         </form>
@@ -292,74 +356,143 @@ function TaskManagement() {
   if (loading) {
     return (
       <div className={classes.loadingSpinner}>
-        <CircularProgress />
+        <CircularProgress size={60} />
       </div>
     );
   }
 
   return (
-    <Container>
-      <Grid container style={{ marginTop: "30px" }}>
+    <Container className={classes.root}>
+      <Snackbar
+        open={alert.open}
+        autoHideDuration={6000}
+        onClose={handleCloseAlert}
+      >
+        <Alert onClose={handleCloseAlert} severity={alert.severity}>
+          {alert.message}
+        </Alert>
+      </Snackbar>
+
+      <Box className={classes.header}>
+        <Typography variant="h4" component="h1" gutterBottom>
+          Task Management System
+        </Typography>
+        <Typography variant="subtitle1" color="textSecondary">
+          {userType === "Project Leader" || userType === "PL" 
+            ? "Manage your team's tasks and assignments"
+            : "View your assigned tasks"}
+        </Typography>
+      </Box>
+
+      <Grid container spacing={3}>
         <Grid item xs={12}>
-          {alert}
-          <TableContainer component={Paper}>
-            <Table aria-label="simple table">
-              <TableHead>
-                <TableRow className={classes.tableHeader}>
-                  <TableCell style={{ color: "white" }}>Name</TableCell>
-                  <TableCell style={{ color: "white" }}>Task Type</TableCell>
-                  <TableCell style={{ color: "white" }}>Task Link</TableCell>
-                  <TableCell style={{ color: "white" }}>Task Status</TableCell>
-                  <TableCell style={{ color: "white" }}>Allocate Task</TableCell>
+          <TableContainer component={Paper} elevation={3}>
+            <Table>
+              <TableHead className={classes.tableHeader}>
+                <TableRow>
+                  <TableCell>Team Member</TableCell>
+                  <TableCell>Role</TableCell>
+                  <TableCell>Task</TableCell>
+                  <TableCell>Status</TableCell>
+                  <TableCell align="right">Actions</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
-                {users.map((user) => (
-                  <TableRow key={user.id} className={classes.tableRow}>
-                    <TableCell>{user.name}</TableCell>
-                    <TableCell>{user.userType}</TableCell>
-                    <TableCell>
-                      {tasks
-                        .filter((task) => task.userId === user.id)
-                        .map((task) =>
-                          task.desc && (
+                {users.map((user) => {
+                  const userTasks = tasks.filter(task => task.userId === user.id);
+                  return (
+                    <TableRow key={user.id} className={classes.tableRow} hover>
+                      <TableCell>
+                        <Box className={classes.userCell}>
+                          <Avatar>
+                            <PersonIcon />
+                          </Avatar>
+                          <div>
+                            <Typography>{user.name}</Typography>
+                            <Typography variant="body2" color="textSecondary">
+                              {user.email}
+                            </Typography>
+                          </div>
+                        </Box>
+                      </TableCell>
+                      <TableCell>
+                        <Chip
+                          label={user.userType}
+                          color={user.userType === "Project Leader" ? "primary" : "default"}
+                          size="small"
+                          className={classes.roleChip}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        {userTasks.map(task => (
+                          <div key={task._id}>
                             <a
                               href={task.desc.startsWith("http") ? task.desc : `https://${task.desc}`}
                               target="_blank"
                               rel="noopener noreferrer"
-                              style={{ color: "blue", textDecoration: "underline" }}
-                              key={task.id}
+                              className={classes.taskLink}
                             >
                               {task.desc}
                             </a>
-                          )
-                        )}
-                    </TableCell>
-                    <TableCell>
-                      {tasks
-                        .filter((task) => task.userId === user.id)
-                        .map((task) => (
-                          <div key={task.id}>{task.status || "Not Available"}</div>
+                            <Typography variant="caption" display="block">
+                              {new Date(task.taskDate).toLocaleDateString()}
+                            </Typography>
+                          </div>
                         ))}
-                    </TableCell>
-                    {userType === "PL" && (
-                      <TableCell align="right">
-                        <EditIcon
-                          style={{
-                            color: "#27ae60",
-                            marginLeft: "5px",
-                            cursor: "pointer",
-                          }}
-                          onClick={() => {
-                            setIsEdit(true);
-                            setUserForm(user);
-                            setCreateModal(true);
-                          }}
-                        />
+                        {userTasks.length === 0 && "No tasks assigned"}
                       </TableCell>
-                    )}
-                  </TableRow>
-                ))}
+                      <TableCell>
+                        {userTasks.map(task => (
+                          <Chip
+                            key={task._id}
+                            label={task.status || "Pending"}
+                            color={
+                              task.status === "Completed" ? "primary" :
+                              task.status === "In Progress" ? "secondary" : "default"
+                            }
+                            size="small"
+                            className={classes.statusChip}
+                          />
+                        ))}
+                      </TableCell>
+                      <TableCell align="right">
+                        {(userType === "Project Leader" || userType === "PL") && (
+                          <Box display="flex" justifyContent="flex-end">
+                            <IconButton
+                              color="primary"
+                              onClick={() => {
+                                setIsEdit(true);
+                                setUserForm({
+                                  userId: user.id,
+                                  username: user.name,
+                                  userType: user.userType,
+                                  taskdate: "",
+                                  taskdesc: "",
+                                  status: "Pending",
+                                  allocatedBy: username
+                                });
+                                setCreateModal(true);
+                              }}
+                              className={classes.actionButton}
+                            >
+                              <EditIcon />
+                            </IconButton>
+                            <IconButton
+                              color="secondary"
+                              onClick={() => {
+                                setSelectedUser(user);
+                                setFeedbackModal(true);
+                              }}
+                              className={classes.actionButton}
+                              disabled={user.id === user.id}
+                            >
+                            </IconButton>
+                          </Box>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </TableContainer>

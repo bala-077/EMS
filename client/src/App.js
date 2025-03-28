@@ -16,78 +16,87 @@ import TaskAllocate from './Components/TaskAllocate/TaskManagement'
 import Feedback from './Components/Feedback/Feedback'
 import ProjectStatus from './Components/ProjectAllocate/ProjectStatus'
 import LeadAllocation from './Components/ProjectAllocate/LeadAllocation'
+import UserContext from './Components/context/userContext'
+import LeadStatus from './Components/ProjectAllocate/LeadStatus'
 export default function App() {
-  const [ data, setData ] = useState('')
+  const [data, setData] = useState('')
   return (
-    <Router>
-      <Switch>
-        <Route path="/" exact component={Login} />
+    <UserContext>
+      <Router>
         <Switch>
           <Route path="/" exact component={Login} />
           <Switch>
-            <Route path="/dashboard" exact>
-              <Nav>
-                <Dashboard />
-              </Nav>
-            </Route>
-            <Route path="/books" exact>
-              <Nav>
-                <Books />
-              </Nav>
-            </Route>
-            <Route path="/borrow" exact>
-              <Nav>
-                <Borrow />
-              </Nav>
-            </Route>
-            <Route path="/reserve" exact>
-              <Nav>
-                <Reserve />
-              </Nav>
-            </Route>
-            <Route path="/requests" exact>
-              <Nav>
-                <Request />
-              </Nav>
-            </Route>
-            <Route path="/users" exact>
-              <Nav>
-                <UserManagement />
-              </Nav>
-            </Route>
-            <Route path="/projectallocate" exact>
-              <Nav>
-                <ProjectAllocate />
-              </Nav>
-            </Route>
-            <Route path="/developerallocate" exact>
-              <Nav>
-                <LeadAllocation />
-              </Nav>
-            </Route>
-            <Route path="/projectstatus" exact>
-              <Nav>
-                <ProjectStatus />
-              </Nav>
-            </Route>
-            <Route path="/reports" exact>
-              <Nav>
-                <Reports />
-              </Nav>
-            </Route>
-            <Route path="/taskallocate" exact>
-              <Nav>
-                <TaskAllocate />
-              </Nav>
-            </Route>
-            <Route path="/feedback" exact>
-              <Nav>
-                <Feedback />
-              </Nav>
-            </Route>
+            <Route path="/" exact component={Login} />
+            <Switch>
+              <Route path="/dashboard" exact>
+                <Nav>
+                  <Dashboard />
+                </Nav>
+              </Route>
+              <Route path="/books" exact>
+                <Nav>
+                  <Books />
+                </Nav>
+              </Route>
+              <Route path="/borrow" exact>
+                <Nav>
+                  <Borrow />
+                </Nav>
+              </Route>
+              <Route path="/reserve" exact>
+                <Nav>
+                  <Reserve />
+                </Nav>
+              </Route>
+              <Route path="/requests" exact>
+                <Nav>
+                  <Request />
+                </Nav>
+              </Route>
+              <Route path="/users" exact>
+                <Nav>
+                  <UserManagement />
+                </Nav>
+              </Route>
+              <Route path="/projectallocate" exact>
+                <Nav>
+                  <ProjectAllocate />
+                </Nav>
+              </Route>
+              <Route path="/developerallocate" exact>
+                <Nav>
+                  <LeadAllocation />
+                </Nav>
+              </Route>
+              <Route path="/projectstatus" exact>
+                <Nav>
+                  <ProjectStatus />
+                </Nav>
+              </Route>
+              <Route path="/reports" exact>
+                <Nav>
+                  <Reports />
+                </Nav>
+              </Route>
+              <Route path="/leadstatus" exact>
+                <Nav>
+                  <LeadStatus />
+                </Nav>
+              </Route>
+              <Route path="/taskallocate" exact>
+                <Nav>
+                  <TaskAllocate />
+                </Nav>
+              </Route>
+              <Route path="/feedback" exact>
+                <Nav>
+                  <Feedback />
+                </Nav>
+              </Route>
+            </Switch>
           </Switch>
         </Switch>
-      </Switch>
-    </Router>
+      </Router>
+    </UserContext>
   )
 }

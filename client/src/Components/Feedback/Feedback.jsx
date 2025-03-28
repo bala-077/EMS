@@ -1,5 +1,4 @@
-import React, { useState, useEffect } from "react";
-
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Grid,
   TextField,
@@ -26,14 +25,15 @@ import {
 import { makeStyles } from "@material-ui/core/styles";
 import AddIcon from "@material-ui/icons/Add";
 import EditIcon from "@material-ui/icons/Edit";
-import FeedbackIcon from "@material-ui/icons/Feedback"; // Icon for feedback
+import FeedbackIcon from "@material-ui/icons/Feedback";
 import Alert from "@material-ui/lab/Alert";
 import { useForm } from "./../../Custom-Hook/userForm";
 import { checkToken, fetchTaskUsers } from "./../../Api/Users/Users";
 import { useHistory } from "react-router-dom";
 import axios from "axios";
 
-// Custom styles using makeStyles
+const API_BASE_URL = "http://localhost:4000/api";
+
 const useStyles = makeStyles((theme) => ({
   tableHeader: {
     backgroundColor: theme.palette.primary.main,
@@ -61,10 +61,42 @@ const useStyles = makeStyles((theme) => ({
     alignItems: "center",
     height: "100vh",
   },
+  projectTable: {
+    marginBottom: theme.spacing(4),
+  },
+  feedbackButton: {
+    textTransform: 'none',
+    marginLeft: theme.spacing(1),
+  },
+  formControl: {
+    minWidth: '100%',
+    margin: theme.spacing(1, 0),
+  },
 }));
+
+const SKILLS = [
+  "Communication",
+  "Problem Solving",
+  "Teamwork",
+  "Time Management",
+  "Leadership",
+  "Technical Skills",
+  "Creativity",
+  "Adaptability",
+  "Project Management",
+  "Critical Thinking",
+  "Attention to Detail",
+  "Organization",
+  "Learning Ability",
+  "Collaboration",
+  "Initiative",
+];
 
 function FeedBack() {
   const classes = useStyles();
+  const history = useHistory();
+  
+  // State declarations
   const [users, setUsers] = useState([]);
   const [userForm, handleChange, setUserForm] = useForm({
     userId: "",
@@ -81,34 +113,62 @@ function FeedBack() {
   const [alert, setAlert] = useState("");
   const [userType, setUserType] = useState(null);
   const [tasks, setTasks] = useState([]);
+  const [TL, setTL] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [feedbackModal, setFeedbackModal] = useState(false); // State for feedback modal
-  const [selectedUser, setSelectedUser] = useState(null); // Selected user for feedback
+  const [feedbackModal, setFeedbackModal] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [projects, setProjects] = useState([]);
   const [feedback, setFeedback] = useState({
-    skills: Array(15).fill(""), // Initializes 15 empty values for skill feedback
+    skills: Array(SKILLS.length).fill(""),
     overallReview: "",
+    projectId: "",
   });
 
-  const history = useHistory();
+  // API call functions
+  const getTL = useCallback(async () => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/allocate/get-allocation`);
+      setTL(response.data.data);
+    } catch (err) {
+      console.error("Error fetching team leads:", err);
+      setErrorAlert(<Alert severity="error">Failed to fetch team allocation data</Alert>);
+    }
+  }, []);
 
-  const skills = [
-    "Communication",
-    "Problem Solving",
-    "Teamwork",
-    "Time Management",
-    "Leadership",
-    "Technical Skills",
-    "Creativity",
-    "Adaptability",
-    "Project Management",
-    "Critical Thinking",
-    "Attention to Detail",
-    "Organization",
-    "Learning Ability",
-    "Collaboration",
-    "Initiative",
-  ];
+  const getProjects = useCallback(async () => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/allocate/get-status`);
+      setProjects(response.data.data || []);
+    } catch (err) {
+      console.error("Error fetching projects:", err);
+      setErrorAlert(<Alert severity="error">Failed to fetch projects</Alert>);
+      setProjects([]);
+    }
+  }, []);
 
+  const getTasks = useCallback(async () => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/allocate/get-task`);
+      setTasks(response.data.data || []);
+    } catch (err) {
+      console.error("Error fetching tasks:", err);
+      setErrorAlert(<Alert severity="error">Failed to fetch tasks</Alert>);
+      setTasks([]);
+    }
+  }, []);
+
+  const getUsers = useCallback(async () => {
+    try {
+      const res = await fetchTaskUsers();
+      setUsers(res || []);
+    } catch (e) {
+      console.error("Error fetching users:", e);
+      setErrorAlert(<Alert severity="error">Failed to fetch users</Alert>);
+      setUsers([]);
+    }
+  }, []);
+
+  // Event handlers
   const handleSkillChange = (index, value) => {
     const updatedSkills = [...feedback.skills];
     updatedSkills[index] = value;
@@ -119,58 +179,47 @@ function FeedBack() {
     setFeedback({ ...feedback, overallReview: e.target.value });
   };
 
-  const handleFeedbackSubmit = (e) => {
-    e.preventDefault();
-    console.log("Feedback for user:", selectedUser, feedback);
-    // You can handle form submission logic here, such as making an API request
-    setFeedbackModal(false); // Close the feedback modal
+  const handleProjectChange = (e) => {
+    setFeedback({ ...feedback, projectId: e.target.value });
   };
 
-  const getTask = async () => {
+  const handleFeedbackSubmit = async (e) => {
+    e.preventDefault();
+    setProcessing(true);
+    
     try {
-      const response = await axios.get("http://localhost:4000/api/allocate/get-task");
-      setTasks(response.data.data); // Store tasks in state
-      setLoading(false);
+      const feedbackData = {
+        userId: selectedUser.id,
+        projectId: feedback.projectId,
+        skills: feedback.skills,
+        overallReview: feedback.overallReview,
+      };
+      
+      const res = await axios.post(`${API_BASE_URL}/feedback/submit`, feedbackData);
+      
+      if (res.status === 200 || res.status === 201) {
+        setAlert(<Alert severity="success">Feedback submitted successfully!</Alert>);
+        setFeedbackModal(false);
+        setFeedback({
+          skills: Array(SKILLS.length).fill(""),
+          overallReview: "",
+          projectId: "",
+        });
+      }
     } catch (err) {
-      console.log(err.message);
-      setLoading(false);
+      setErrorAlert(
+        <Alert severity="error">
+          {err.response?.data?.message || "Failed to submit feedback"}
+        </Alert>
+      );
+    } finally {
+      setProcessing(false);
+      setTimeout(() => {
+        setAlert("");
+        setErrorAlert("");
+      }, 5000);
     }
   };
-
-  useEffect(() => {
-    let isCancelled = false;
-    const fetchApi = async () => {
-      try {
-        const res = await checkToken();
-        if (res === undefined || res.status === 401) {
-          history.push("/");
-        } else if (!isCancelled) {
-          setUserType(res.data.userType);
-        }
-      } catch (e) {
-        console.log(e);
-      }
-    };
-    fetchApi();
-    return () => (isCancelled = true);
-  }, [history]);
-
-  useEffect(() => {
-    getTask(); // Fetch tasks
-    let isCancelled = false;
-    const fetchApi = async () => {
-      try {
-        const res = await fetchTaskUsers();
-        if (!isCancelled) {
-          setUsers(res); // Set users in state
-        }
-      } catch (e) {
-        console.log(e);
-      }
-    };
-    fetchApi();
-    return () => (isCancelled = true);
-  }, []);
 
   const registerUser = async (e) => {
     e.preventDefault();
@@ -185,11 +234,8 @@ function FeedBack() {
         desc: userForm.taskdesc,
         status: userForm.status || "Pending",
       };
-      console.log("Sending payload:", taskData);
 
-      const res = await axios.post("http://localhost:4000/api/allocate/create-task", taskData);
-
-      console.log("Response from server:", res.data);
+      const res = await axios.post(`${API_BASE_URL}/allocate/create-task`, taskData);
 
       if (res.status === 200 || res.status === 201) {
         setCreateModal(false);
@@ -200,37 +246,48 @@ function FeedBack() {
           setUsers([res.data, ...users]);
           setAlert(<Alert severity="success">Successfully added new Task.</Alert>);
         }
-        getTask(); // Refresh tasks
-
-        setTimeout(() => {
-          setAlert("");
-        }, 5000);
-      } else {
-        setErrorAlert(
-          <Alert style={{ textTransform: "capitalize" }} severity="error">
-            {res.data.error}
-          </Alert>
-        );
-        setTimeout(() => {
-          setErrorAlert("");
-        }, 10000);
+        getTasks();
       }
     } catch (err) {
-      console.error("Error:", err.response?.data || err.message);
       setErrorAlert(
-        <Alert style={{ textTransform: "capitalize" }} severity="error">
+        <Alert severity="error">
           {err.response?.data?.error || err.message || "An error occurred."}
         </Alert>
       );
-      setTimeout(() => {
-        setErrorAlert("");
-      }, 10000);
+    } finally {
+      setProcessing(false);
     }
-
-    setProcessing(false);
   };
 
-  const addDialog = (
+  // Component lifecycle
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const res = await checkToken();
+        if (res === undefined || res.status === 401) {
+          history.push("/");
+        } else {
+          setUserType(res.data.userType);
+          await Promise.all([
+            getTL(),
+            getProjects(),
+            getTasks(),
+            getUsers()
+          ]);
+        }
+      } catch (e) {
+        console.error("Initialization error:", e);
+        setErrorAlert(<Alert severity="error">Failed to initialize data</Alert>);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [history, getTL, getProjects, getTasks, getUsers]);
+
+  // Dialog components
+  const AddDialog = () => (
     <Dialog
       open={createModal}
       onClose={() => {
@@ -329,71 +386,109 @@ function FeedBack() {
     </Dialog>
   );
 
-  const feedbackDialog = (
+  const FeedbackDialog = () => (
     <Dialog
       open={feedbackModal}
       onClose={() => setFeedbackModal(false)}
       scroll="body"
       fullWidth
+      maxWidth="md"
     >
       <DialogTitle className={classes.modalTitle}>
-        Developer Skills Feedback for {selectedUser?.name}
+        Developer Feedback for {selectedUser?.name}
       </DialogTitle>
       <DialogContent className={classes.modalContent}>
-        <form onSubmit={handleFeedbackSubmit} method="post">
-          <Grid container spacing={2}>
-            {skills.map((skill, index) => (
-              <Grid item xs={12} key={index}>
-                <FormControl component="fieldset">
+        <form onSubmit={handleFeedbackSubmit}>
+          <Grid container spacing={3}>
+            <Grid item xs={12}>
+              <FormControl className={classes.formControl}>
+                <TextField
+                  select
+                  value={feedback.projectId}
+                  onChange={handleProjectChange}
+                  required
+                  variant="outlined"
+                  SelectProps={{
+                    native: true,
+                  }}
+                >
+                  <option value="">Select a project</option>
+                  {projects
+                    .filter(project => 
+                      project.plname && 
+                      Array.isArray(project.plname) &&
+                      project.plname.includes(selectedUser?.name)
+                    )
+                    .map((project) => (
+                      <option key={project._id} value={project._id}>
+                        {project.projectname}
+                      </option>
+                    ))}
+                </TextField>
+              </FormControl>
+            </Grid>
+            
+            {SKILLS.map((skill, index) => (
+              <Grid item xs={12} sm={6} md={4} key={index}>
+                <FormControl component="fieldset" fullWidth>
                   <Typography variant="subtitle1">{skill}</Typography>
                   <RadioGroup
-                    value={feedback.skills[index]}
+                    value={feedback.skills[index] || ""}
                     onChange={(e) => handleSkillChange(index, e.target.value)}
                     row
                   >
                     <FormControlLabel
                       value="Excellent"
-                      control={<Radio />}
+                      control={<Radio color="primary" />}
                       label="Excellent"
                     />
                     <FormControlLabel
                       value="Good"
-                      control={<Radio />}
+                      control={<Radio color="primary" />}
                       label="Good"
                     />
                     <FormControlLabel
                       value="Needs Improvement"
-                      control={<Radio />}
+                      control={<Radio color="primary" />}
                       label="Needs Improvement"
                     />
                   </RadioGroup>
                 </FormControl>
               </Grid>
             ))}
+            
+            <Grid item xs={12}>
+              <TextField
+                label="Overall Review"
+                value={feedback.overallReview}
+                onChange={handleOverallReviewChange}
+                multiline
+                rows={4}
+                fullWidth
+                variant="outlined"
+                required
+              />
+            </Grid>
           </Grid>
-
-          <Grid item xs={12} style={{ marginTop: "20px" }}>
-            <TextField
-              label="Overall Review"
-              value={feedback.overallReview}
-              onChange={handleOverallReviewChange}
-              multiline
-              rows={4}
-              fullWidth
-              variant="outlined"
-            />
-          </Grid>
-
-          <Grid item xs={12} style={{ marginTop: "20px" }}>
+          
+          <DialogActions>
+            <Button
+              onClick={() => setFeedbackModal(false)}
+              color="secondary"
+              disabled={processing}
+            >
+              Cancel
+            </Button>
             <Button
               type="submit"
-              variant="contained"
               color="primary"
-              fullWidth
+              variant="contained"
+              disabled={processing}
+              endIcon={processing ? <CircularProgress size={20} /> : null}
             >
               Submit Feedback
             </Button>
-          </Grid>
+          </DialogActions>
         </form>
       </DialogContent>
     </Dialog>
@@ -412,34 +507,36 @@ function FeedBack() {
       <Grid container style={{ marginTop: "30px" }}>
         <Grid item xs={12}>
           {alert}
+          {errorAlert}
+          
+          <Typography variant="h5" gutterBottom>Team Members</Typography>
           <TableContainer component={Paper}>
-            <Table aria-label="simple table">
-              <TableHead>
-                <TableRow className={classes.tableHeader}>
+            <Table>
+              <TableHead className={classes.tableHeader}>
+                <TableRow>
                   <TableCell style={{ color: "white" }}>Name</TableCell>
-                  <TableCell style={{ color: "white" }}>User Type</TableCell>
-                  <TableCell  align="right" style={{ color: "white" }}>Feedback</TableCell>
+                  <TableCell style={{ color: "white" }}>Role</TableCell>
+                  <TableCell align="right" style={{ color: "white" }}>Actions</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {users.map((user) => (
-                  <TableRow key={user.id} className={classes.tableRow}>
+                  <TableRow key={user.id} hover>
                     <TableCell>{user.name}</TableCell>
                     <TableCell>{user.userType}</TableCell>
-                    
-                    
                     <TableCell align="right">
-                      <FeedbackIcon
-                        style={{
-                          color: "#1976d2",
-                          marginLeft: "5px",
-                          cursor: "pointer",
-                        }}
+                      <Button
+                        variant="outlined"
+                        color="primary"
+                        className={classes.feedbackButton}
+                        startIcon={<FeedbackIcon />}
                         onClick={() => {
                           setSelectedUser(user);
                           setFeedbackModal(true);
                         }}
-                      />
+                      >
+                        Feedback
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -448,8 +545,9 @@ function FeedBack() {
           </TableContainer>
         </Grid>
       </Grid>
-      {addDialog}
-      {feedbackDialog}
+      
+      <AddDialog />
+      <FeedbackDialog />
     </Container>
   );
 }

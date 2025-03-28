@@ -60,13 +60,11 @@ function LeadAllocation() {
         setStoredata(username);
       } catch (error) {
         console.error("Error parsing user data:", error);
-        setErrorAlert("Failed to load user data");
       }
     } else {
       console.log("No user data found in sessionStorage");
-      setErrorAlert("No user session found");
     }
-  };
+  }
 
   const getTL = async () => {
     try {
@@ -79,15 +77,14 @@ function LeadAllocation() {
           teamLead: item.plname,
         }))
       );
-      console.log(response, "project manager")
       setTls(response.data.data);
-      setStatus(response.data.data, "reorehorfuhiiuhuihiuh");
+      setStatus(response.data.data); // Set status data here
     } catch (err) {
-      console.error("Error fetching team leads:", err);
-      setErrorAlert("Failed to fetch team allocation data");
+      console.log(err.message);
     }
   };
 
+  // Function to compare book fields with status data
   const checkBookFieldsOnStatusUpdate = () => {
     if (status.length > 0 && projects.length > 0) {
       const mismatches = [];
@@ -133,10 +130,7 @@ function LeadAllocation() {
     const fetchData = async () => {
       try {
         const tokenRes = await checkToken();
-        if (tokenRes === undefined || tokenRes.status === 401) {
-          history.push("/");
-          return;
-        }
+        if (tokenRes === undefined || tokenRes.status === 401) history.push("/");
 
         const [usersData, booksData] = await Promise.all([
           fetchProjectDeveloper(),
@@ -161,10 +155,9 @@ function LeadAllocation() {
             teamLead: item.plname,
           }))
         );
-        setStatus(leadRes.data.data);
+        setStatus(leadRes.data.data); // Set status data
       } catch (error) {
-        console.error("Error fetching data:", error);
-        setErrorAlert("Failed to fetch required data");
+        console.error(error);
       } finally {
         setLoading(false);
       }
@@ -173,6 +166,7 @@ function LeadAllocation() {
     fetchData();
   }, [history]);
 
+  // Run comparison when status or projects change
   useEffect(() => {
     checkBookFieldsOnStatusUpdate();
   }, [status, projects]);
@@ -193,11 +187,7 @@ function LeadAllocation() {
 
   const handleDeveloperSelection = (event, developer) => {
     const developersSet = new Set(selectedDevelopers.map((dev) => dev.id));
-    if (event.target.checked) {
-      developersSet.add(developer.id);
-    } else {
-      developersSet.delete(developer.id);
-    }
+    event.target.checked ? developersSet.add(developer.id) : developersSet.delete(developer.id);
     setSelectedDevelopers(users.filter((user) => developersSet.has(user.id)));
   };
 
@@ -212,35 +202,22 @@ function LeadAllocation() {
       const payload = {
         ...bookForm,
         plname: selectedDevelopers.map((dev) => dev.name),
-        action: "add" // Added action parameter for backend
       };
 
       setProcessing(true);
-      const response = await axios.post(
-        "http://localhost:4000/api/allocate/createlead", 
-        payload
-      );
-      
+      await axios.post("http://localhost:4000/api/allocate/createlead", payload);
       setAlert("Project developers allocated successfully.");
       setEditModal(false);
-      
-      // Update local state with the response data
-      const updatedProject = response.data;
-      setTL(prevTL => [
-        ...prevTL.filter(item => item.projectName !== updatedProject.projectname),
-        {
-          projectName: updatedProject.projectname,
-          teamLead: updatedProject.plname
-        }
-      ]);
-      
-      setStatus(prevStatus => [
-        ...prevStatus.filter(item => item.projectname !== updatedProject.projectname),
-        updatedProject
-      ]);
+      const leadRes = await axios.get("http://localhost:4000/api/allocate/get-lead");
+      setTL(
+        leadRes.data.data.map((item) => ({
+          projectName: item.projectname,
+          teamLead: item.plname,
+        }))
+      );
+      setStatus(leadRes.data.data); // Update status after allocation
     } catch (err) {
-      console.error("Error updating project:", err);
-      setErrorAlert(err.response?.data?.error || "Error while allocating project developers.");
+      setErrorAlert("Error while allocating project developers.");
     } finally {
       setProcessing(false);
     }
@@ -249,17 +226,10 @@ function LeadAllocation() {
   const handleStageChange = async (projectId, stage) => {
     try {
       const project = projects.find((p) => p._id === projectId);
-      if (!project) {
-        throw new Error("Project not found");
-      }
-
-      const response = await axios.put(
-        "http://localhost:4000/api/allocate/update-stage", 
-        {
-          stage,
-          projectname: project.projectname,
-        }
-      );
+      await axios.put("http://localhost:4000/api/allocate/update-stage", {
+        stage,
+        projectname: project.projectname,
+      });
 
       setProjectStages((prevStages) => ({
         ...prevStages,
@@ -267,18 +237,17 @@ function LeadAllocation() {
       }));
 
       // Update status data after stage change
-      setStatus(prevStatus => 
-        prevStatus.map(item => 
-          item.projectname === project.projectname 
-            ? { ...item, stage } 
-            : item
-        )
+      const updatedStatus = status.map(item => 
+        item.projectname === project.projectname 
+          ? { ...item, stage } 
+          : item
       );
+      setStatus(updatedStatus);
 
       setAlert("Project stage updated successfully.");
     } catch (err) {
-      console.error("Error updating stage:", err);
-      setErrorAlert(err.response?.data?.error || "Error while updating project stage.");
+      setErrorAlert("Error while updating project stage.");
+      console.log(err.messagew)
     }
   };
 
@@ -300,153 +269,97 @@ function LeadAllocation() {
   };
 
   const editDialog = (
-    <Dialog 
-      open={editModal} 
-      onClose={() => {
-        setEditModal(false);
-        setSelectedDevelopers([]);
-      }} 
-      fullWidth
-      maxWidth="md"
-    >
+    <Dialog open={editModal} onClose={() => setEditModal(false)} fullWidth>
       <form onSubmit={updateProject}>
         <DialogTitle>Edit Project</DialogTitle>
         <DialogContent>
           <Container>
-            {errorAlert && (
-              <Alert severity="error" onClose={() => setErrorAlert("")}>
-                {errorAlert}
-              </Alert>
-            )}
-            {alert && (
-              <Alert severity="success" onClose={() => setAlert("")}>
-                {alert}
-              </Alert>
-            )}
+            {errorAlert && <Alert severity="error">{errorAlert}</Alert>}
+            {alert && <Alert severity="success">{alert}</Alert>}
 
             <TextField name="id" value={bookForm.id} type="hidden" />
 
-            <Grid container spacing={2}>
-              <Grid item xs={12} md={6}>
-                <TextField
-                  label="Project Name"
-                  name="projectname"
-                  value={bookForm.projectname}
-                  onChange={handleChange}
-                  fullWidth
-                  margin="normal"
-                  disabled
-                />
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <TextField
-                  label="Coding Language"
-                  name="codinglanguage"
-                  value={bookForm.codinglanguage}
-                  onChange={handleChange}
-                  fullWidth
-                  margin="normal"
-                  disabled
-                />
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <TextField
-                  label="Database Name"
-                  name="databasename"
-                  value={bookForm.databasename}
-                  onChange={handleChange}
-                  fullWidth
-                  margin="normal"
-                  disabled
-                />
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <TextField
-                  label="Duration"
-                  name="duration"
-                  value={bookForm.duration}
-                  onChange={handleChange}
-                  fullWidth
-                  margin="normal"
-                  disabled
-                />
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <TextField
-                  label="Register Date"
-                  name="registerdate"
-                  value={bookForm.registerdate}
-                  onChange={handleChange}
-                  fullWidth
-                  margin="normal"
-                  disabled
-                />
-              </Grid>
-              <Grid item xs={12}>
-                <TextField
-                  label="Description"
-                  name="description"
-                  value={bookForm.description}
-                  onChange={handleChange}
-                  fullWidth
-                  margin="normal"
-                  multiline
-                  rows={4}
-                  disabled
-                />
-              </Grid>
-              <Grid item xs={12}>
-                <FormControl fullWidth margin="normal">
-                  <Typography variant="subtitle1" gutterBottom>
-                    Project Stage
-                  </Typography>
-                  <Select
-                    value={bookForm.stage || "Start"}
-                    onChange={(e) => setBookForm({...bookForm, stage: e.target.value})}
-                    fullWidth
-                  >
-                    <MenuItem value="Start">Start</MenuItem>
-                    <MenuItem value="Process">Process</MenuItem>
-                    <MenuItem value="Testing">Testing</MenuItem>
-                    <MenuItem value="Deployment">Deployment</MenuItem>
-                    <MenuItem value="Finish">Finish</MenuItem>
-                  </Select>
-                </FormControl>
-              </Grid>
-            </Grid>
+            <TextField
+              label="Project Name"
+              name="projectname"
+              value={bookForm.projectname}
+              onChange={handleChange}
+              fullWidth
+              margin="normal"
+              disabled
+            />
 
-            <Typography variant="h6" style={{ marginTop: "16px", marginBottom: "8px" }}>
+            <TextField
+              label="Coding Language"
+              name="codinglanguage"
+              value={bookForm.codinglanguage}
+              onChange={handleChange}
+              fullWidth
+              margin="normal"
+              disabled
+            />
+
+            <TextField
+              label="Database Name"
+              name="databasename"
+              value={bookForm.databasename}
+              onChange={handleChange}
+              fullWidth
+              margin="normal"
+              disabled
+            />
+
+            <TextField
+              label="Duration"
+              name="duration"
+              value={bookForm.duration}
+              onChange={handleChange}
+              fullWidth
+              margin="normal"
+              disabled
+            />
+
+            <TextField
+              label="Register Date"
+              name="registerdate"
+              value={bookForm.registerdate}
+              onChange={handleChange}
+              fullWidth
+              margin="normal"
+              disabled
+            />
+
+            <TextField
+              label="Description"
+              name="description"
+              value={bookForm.description}
+              onChange={handleChange}
+              fullWidth
+              margin="normal"
+              multiline
+              rows={4}
+              disabled
+            />
+
+            <Typography variant="h6" style={{ marginTop: "16px" }}>
               Select Developers
             </Typography>
-            <Grid container spacing={1}>
-              {users.map((user) => (
-                <Grid item xs={12} sm={6} md={4} key={user.id}>
-                  <FormControlLabel
-                    control={
-                      <Checkbox
-                        checked={selectedDevelopers.some((dev) => dev.id === user.id)}
-                        onChange={(event) => handleDeveloperSelection(event, user)}
-                        name={user.name}
-                        color="primary"
-                      />
-                    }
-                    label={user.name}
+            {users.map((user) => (
+              <FormControlLabel
+                key={user.id}
+                control={
+                  <Checkbox
+                    checked={selectedDevelopers.some((dev) => dev.id === user.id)}
+                    onChange={(event) => handleDeveloperSelection(event, user)}
+                    name={user.name}
                   />
-                </Grid>
-              ))}
-            </Grid>
+                }
+                label={user.name}
+              />
+            ))}
           </Container>
         </DialogContent>
         <DialogActions>
-          <Button 
-            onClick={() => {
-              setEditModal(false);
-              setSelectedDevelopers([]);
-            }} 
-            color="secondary"
-          >
-            Cancel
-          </Button>
           <Button
             type="submit"
             variant="contained"
@@ -462,42 +375,22 @@ function LeadAllocation() {
   );
 
   return (
-    <Container maxWidth="lg" style={{ marginTop: "20px", marginBottom: "20px" }}>
-      {alert && (
-        <Alert 
-          severity="success" 
-          onClose={() => setAlert("")} 
-          style={{ marginBottom: "20px" }}
-        >
-          {alert}
-        </Alert>
-      )}
-      {errorAlert && (
-        <Alert 
-          severity="error" 
-          onClose={() => setErrorAlert("")} 
-          style={{ marginBottom: "20px" }}
-        >
-          {errorAlert}
-        </Alert>
-      )}
+    <Container>
+      {alert && <Alert severity="success">{alert}</Alert>}
+      {errorAlert && <Alert severity="error">{errorAlert}</Alert>}
       
       {fieldMismatches.length > 0 && (
-        <Alert 
-          severity="warning" 
-          onClose={() => setFieldMismatches([])} 
-          style={{ marginBottom: "20px" }}
-        >
+        <Alert severity="warning">
           Field mismatches detected in {fieldMismatches.length} project(s). 
           Please check console for details.
         </Alert>
       )}
 
-      <Typography variant="h4" component="h1" gutterBottom>
+      <Typography variant="h4" style={{ margin: "20px 0" }}>
         Project Allocation
       </Typography>
 
-      <TableContainer component={Paper} elevation={3}>
+      <TableContainer component={Paper}>
         <Table>
           <TableHead>
             <TableRow>
@@ -519,11 +412,9 @@ function LeadAllocation() {
                   <CircularProgress />
                 </TableCell>
               </TableRow>
-            ) : filterData.length > 0 ? (
+            ) : (
               filterData.map((book) => {
                 const projectAllocation = TL.find((item) => item.projectName === book.projectname);
-                const currentStatus = status.find(item => item.projectname === book.projectname);
-                
                 return (
                   <TableRow key={book._id}>
                     <TableCell>{book.projectname}</TableCell>
@@ -535,42 +426,30 @@ function LeadAllocation() {
                     <TableCell>
                       {projectAllocation?.teamLead?.join(", ") || "Not Assigned"}
                     </TableCell>
-                    <TableCell style={{ 
-                      backgroundColor: getStageColor(currentStatus?.stage || projectStages[book._id])
-                    }}>
-                      <FormControl fullWidth>
-                        <p>{currentStatus?.stage || projectStages[book._id] || "Start"}</p>
-                      </FormControl>
+                    <TableCell style={{ backgroundColor: getStageColor(projectStages[book._id]) }}>
+                      <Select
+                        value={status.projectname === book.projectname ? status.projectname : ""}
+                        onChange={(e) => handleStageChange(book._id, e.target.value)}
+                      >
+                        <MenuItem value="Start">Start</MenuItem>
+                        <MenuItem value="Process">Process</MenuItem>
+                        <MenuItem value="Testing">Testing</MenuItem>
+                        <MenuItem value="Deployment">Deployment</MenuItem>
+                        <MenuItem value="Finish">Finish</MenuItem>
+                      </Select>
                     </TableCell>
                     <TableCell align="center">
-                      <Button
-                        startIcon={<EditIcon />}
-                        style={{ color: "#27ae60" }}
+                      <EditIcon
+                        style={{ cursor: "pointer", color: "#27ae60" }}
                         onClick={() => {
-                          setBookForm({
-                            ...book,
-                            stage: currentStatus?.stage || projectStages[book._id] || "Start"
-                          });
-                          setSelectedDevelopers(
-                            users.filter(user => 
-                              projectAllocation?.teamLead?.includes(user.name)
-                            )
-                          );
+                          setBookForm(book);
                           setEditModal(true);
                         }}
-                      >
-                        Edit
-                      </Button>
+                      />
                     </TableCell>
                   </TableRow>
                 );
               })
-            ) : (
-              <TableRow>
-                <TableCell colSpan={9} align="center">
-                  No projects assigned to you
-                </TableCell>
-              </TableRow>
             )}
           </TableBody>
         </Table>

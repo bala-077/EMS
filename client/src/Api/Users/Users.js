@@ -71,7 +71,7 @@ export const createUser = async (user) => {
             name, username, password, userType
         }, {
             headers: {
-                Authorization: 'Bearer ' + token //the token is a variable which holds the token
+                Authorization: 'Bearer' + token //the token is a variable which holds the token
             }
         })
         return data;
