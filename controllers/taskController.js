@@ -5,6 +5,7 @@ const route = express.Router();
 
 // Create a new task
 route.post('/create-task', async (req, res) => {
+    console.log(req.body)
     try {
         // Validate required fields
         const requiredFields = ['userId', 'plname', 'type', 'taskDate', 'desc'];
@@ -77,21 +78,58 @@ route.get("/get-task", async (req, res) => {
 });
 
 // Get tasks for specific user (Developer view)
-route.get("/get-user-tasks/:userId", async (req, res) => {
+// route.get("/get-user-tasks/", async (req, res) => {
+//     try {
+//         const { plname } = req.body;
+//         const today = moment().startOf('day');
+        
+//         const data = await TaskAllocation.find({
+//             plnname,
+//             taskDate: {
+//                 $gte: today.toDate(),
+//                 $lte: moment(today).endOf('day').toDate()
+//             },
+//             status: { $ne: "Completed" } // Only show incomplete tasks
+//         });
+        
+//         res.status(200).json({ data });
+//     } catch (err) {
+//         res.status(500).json({ message: err.message });
+//     }
+// });
+
+// Get developer dashboard data - Updated to use query params
+route.get("/developer-dashboard", async (req, res) => {
     try {
-        const { userId } = req.params;
-        const today = moment().startOf('day');
+        const { plname } = req.query; // Changed from req.body to req.query
+        if (!plname) {
+            return res.status(400).json({ message: "plname is required" });
+        }
+
+        const todayStart = moment().startOf('day');
+        const todayEnd = moment().endOf('day');
         
-        const data = await TaskAllocation.find({
-            userId,
+        const tasks = await TaskAllocation.find({
+            plname,
             taskDate: {
-                $gte: today.toDate(),
-                $lte: moment(today).endOf('day').toDate()
-            },
-            status: { $ne: "Completed" } // Only show incomplete tasks
-        });
+                $gte: todayStart.toDate(),
+                $lte: todayEnd.toDate()
+            }
+        }).sort({ createdAt: -1 });
         
-        res.status(200).json({ data });
+        // Calculate stats
+        const totalTasks = tasks.length;
+        const completedTasks = tasks.filter(t => t.status === "Completed").length;
+        const pendingTasks = totalTasks - completedTasks;
+        
+        res.status(200).json({ 
+            stats: {
+                totalTasks,
+                completedTasks,
+                pendingTasks
+            },
+            tasks
+        });
     } catch (err) {
         res.status(500).json({ message: err.message });
     }

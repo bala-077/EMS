@@ -23,11 +23,11 @@ const taskSchema = new mongoose.Schema({
     },
     status: {
         type: String,
-        enum: ["Pending", "In Progress", "Completed"],
+        enum: ["Pending", "Completed"],
         default: "Pending",
     },
     allocatedBy: {
-        type: String,
+        type: String, 
         required: true
     },
     completedAt: {

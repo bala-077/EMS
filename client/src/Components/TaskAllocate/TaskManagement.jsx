@@ -15,7 +15,6 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
-  FormControl,
   DialogActions,
   CircularProgress,
   Typography,
@@ -29,7 +28,6 @@ import { makeStyles } from "@material-ui/core/styles";
 import {
   Add as AddIcon,
   Edit as EditIcon,
-  Feedback as FeedbackIcon,
   Person as PersonIcon
 } from "@material-ui/icons";
 import Alert from "@material-ui/lab/Alert";
@@ -37,6 +35,7 @@ import { useForm } from "./../../Custom-Hook/userForm";
 import { checkToken, fetchTaskUsers } from "./../../Api/Users/Users";
 import { useHistory } from "react-router-dom";
 import { userData } from "../context/userContext";
+import moment from "moment";
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -115,8 +114,6 @@ function TaskManagement() {
   const [userType, setUserType] = useState(null);
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [feedbackModal, setFeedbackModal] = useState(false);
-  const [selectedUser, setSelectedUser] = useState(null);
   const [dateError, setDateError] = useState("");
 
   const history = useHistory();
@@ -124,7 +121,11 @@ function TaskManagement() {
   const getTask = async () => {
     try {
       const response = await axios.get("http://localhost:4000/api/allocate/get-task");
-      setTasks(response.data.data);
+      // Filter tasks to only show today's tasks
+      const todayTasks = response.data.data.filter(task => {
+        return moment(task.taskDate).isSame(moment(), 'day');
+      });
+      setTasks(todayTasks);
       setLoading(false);
     } catch (err) {
       console.error("Error fetching tasks:", err);
@@ -176,7 +177,7 @@ function TaskManagement() {
   const checkTaskExists = (userId, date) => {
     return tasks.some(task => 
       task.userId === userId && 
-      new Date(task.taskDate).toDateString() === new Date(date).toDateString()
+      moment(task.taskDate).isSame(date, 'day')
     );
   };
 
@@ -379,8 +380,11 @@ function TaskManagement() {
         </Typography>
         <Typography variant="subtitle1" color="textSecondary">
           {userType === "Project Leader" || userType === "PL" 
-            ? "Manage your team's tasks and assignments"
-            : "View your assigned tasks"}
+            ? "Manage your team's tasks for today"
+            : "View your assigned tasks for today"}
+        </Typography>
+        <Typography variant="subtitle2" color="textSecondary">
+          {moment().format('dddd, MMMM Do YYYY')}
         </Typography>
       </Box>
 
@@ -426,20 +430,24 @@ function TaskManagement() {
                       <TableCell>
                         {userTasks.map(task => (
                           <div key={task._id}>
-                            <a
-                              href={task.desc.startsWith("http") ? task.desc : `https://${task.desc}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className={classes.taskLink}
-                            >
-                              {task.desc}
-                            </a>
+                            {task.desc.startsWith("http") ? (
+                              <a
+                                href={task.desc}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className={classes.taskLink}
+                              >
+                                {task.desc}
+                              </a>
+                            ) : (
+                              <Typography>{task.desc}</Typography>
+                            )}
                             <Typography variant="caption" display="block">
-                              {new Date(task.taskDate).toLocaleDateString()}
+                              {moment(task.taskDate).format('h:mm A')}
                             </Typography>
                           </div>
                         ))}
-                        {userTasks.length === 0 && "No tasks assigned"}
+                        {userTasks.length === 0 && "No tasks assigned for today"}
                       </TableCell>
                       <TableCell>
                         {userTasks.map(task => (
@@ -466,7 +474,7 @@ function TaskManagement() {
                                   userId: user.id,
                                   username: user.name,
                                   userType: user.userType,
-                                  taskdate: "",
+                                  taskdate: moment().format('YYYY-MM-DD'),
                                   taskdesc: "",
                                   status: "Pending",
                                   allocatedBy: username
@@ -476,16 +484,6 @@ function TaskManagement() {
                               className={classes.actionButton}
                             >
                               <EditIcon />
-                            </IconButton>
-                            <IconButton
-                              color="secondary"
-                              onClick={() => {
-                                setSelectedUser(user);
-                                setFeedbackModal(true);
-                              }}
-                              className={classes.actionButton}
-                              disabled={user.id === user.id}
-                            >
                             </IconButton>
                           </Box>
                         )}

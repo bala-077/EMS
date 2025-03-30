@@ -37,6 +37,7 @@ usersRouter.get("/:id", userExtractor, async (req, res) => {
 usersRouter.post("/", async (req, res) => {
   const body = req.body;
   const password = body.password;
+  console.log(req.body)
 
   if (!password || password.length < 3) {
     return res

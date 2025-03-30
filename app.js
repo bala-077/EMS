@@ -17,6 +17,8 @@ const projectAllocateRouter = require("./controllers/plallocate");
 const route = require("./controllers/ProjectManager");
 const lead = require("./controllers/leadController");
 const router = require("./controllers/taskController");
+const feedbackRoutes = require('./controllers/feedback')
+// const feedbackRoutes = require('./controllers/feedback');
 
 connectDB();
 
@@ -32,7 +34,14 @@ app.use('/api/allocate/', route);
 app.use('/api/allocate/', lead);
 
 //for the task allocation
-app.use('/api/allocate/', router)
+app.use('/api/allocate/', router);
+
+//for the feedback
+app.use('/api/feedback', feedbackRoutes);
+
+
+// //for feedback
+// app.use('/api/feedback', feedbackRoutes);
 
 // Request logging and token handling middleware
 app.use(middleware.requestLogger);
